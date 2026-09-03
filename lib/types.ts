@@ -44,6 +44,7 @@ export interface Profile {
   role: UserRole;
   client_id: string | null;
   full_name: string | null;
+  email: string | null;
   created_at: string;
 }
 
@@ -120,6 +121,38 @@ export interface CalendarEvent {
   reminder_enabled: boolean;
   reminder_minutes_before: number;
   reminder_dismissed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TaskStatus = "todo" | "in_progress" | "done";
+export type TaskPriority = "low" | "medium" | "high";
+
+export const TASK_STATUSES: TaskStatus[] = ["todo", "in_progress", "done"];
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  todo: "Jāizdara",
+  in_progress: "Notiek",
+  done: "Pabeigts",
+};
+
+export const TASK_PRIORITIES: TaskPriority[] = ["low", "medium", "high"];
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: "Zema",
+  medium: "Vidēja",
+  high: "Augsta",
+};
+
+export interface Task {
+  id: string;
+  client_id: string;
+  created_by: string | null;
+  assigned_to: string | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -48,8 +48,6 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
 
   return (
     <div className="space-y-8">
-      <h2 className="text-lg font-semibold">Iestatījumi</h2>
-
       <CollapsibleSection icon={Percent} title="Komisija un izmaksu izsekošana">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card>

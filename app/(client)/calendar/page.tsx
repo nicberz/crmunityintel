@@ -27,7 +27,7 @@ export default async function CalendarPage({
 
   const { data: eventsData, error: eventsError } = await supabase
     .from("calendar_events")
-    .select("*, lead:leads(name), creator:profiles(full_name)")
+    .select("*, lead:leads(name), creator:profiles(full_name, email)")
     .eq("client_id", profile.client_id!)
     .gte("start_at", gridStart.toISOString())
     .lt("start_at", addDays(gridEnd, 1).toISOString())
@@ -37,7 +37,7 @@ export default async function CalendarPage({
   const events: CalendarGridEvent[] = ((eventsData ?? []) as any[]).map((e) => ({
     ...e,
     leadName: e.lead?.name ?? null,
-    creatorName: e.created_by ? e.creator?.full_name || "CRM lietotājs" : null,
+    creatorName: e.created_by ? e.creator?.full_name || e.creator?.email || "CRM lietotājs" : null,
   }));
 
   return (

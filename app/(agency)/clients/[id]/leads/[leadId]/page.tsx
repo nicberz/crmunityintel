@@ -50,7 +50,7 @@ export default async function AgencyLeadDetailPage({ params }: { params: { id: s
       supabase.from("lead_field_values").select("*").eq("lead_id", params.leadId),
       supabase
         .from("calendar_events")
-        .select("*, creator:profiles(full_name)")
+        .select("*, creator:profiles(full_name, email)")
         .eq("lead_id", params.leadId)
         .order("start_at", { ascending: true }),
     ]);
@@ -82,7 +82,7 @@ export default async function AgencyLeadDetailPage({ params }: { params: { id: s
 
   const eventsList: LeadCalendarEvent[] = ((events ?? []) as any[]).map((e) => ({
     ...e,
-    creatorName: e.created_by ? e.creator?.full_name || "CRM lietotājs" : null,
+    creatorName: e.created_by ? e.creator?.full_name || e.creator?.email || "CRM lietotājs" : null,
   }));
 
   return (

@@ -47,7 +47,9 @@ export function AppShell({
     return (
       <div className="flex min-h-screen bg-background">
         <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card">
-          <div className="border-b border-border px-5 py-5 text-base font-semibold">{title}</div>
+          <div className="flex h-16 shrink-0 items-center border-b border-border px-5 text-base font-semibold">
+            {title}
+          </div>
           <nav className="flex flex-1 flex-col gap-1 p-3">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -74,7 +76,7 @@ export function AppShell({
           </div>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-end gap-3 border-b border-border bg-card px-6 py-4">
+          <header className="flex h-16 shrink-0 items-center justify-end gap-3 border-b border-border bg-card px-6">
             {notificationBell}
             <div className="text-right leading-tight">
               <p className="text-sm font-medium">{user.email}</p>

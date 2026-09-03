@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, CalendarDays, Settings } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, ListTodo, Settings } from "lucide-react";
 import { requireClientUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
@@ -9,6 +9,7 @@ const navItems = [
   { href: "/overview", label: "Pārskats", icon: LayoutDashboard },
   { href: "/leads", label: "Leadi", icon: Users },
   { href: "/calendar", label: "Kalendārs", icon: CalendarDays },
+  { href: "/tasks", label: "Uzdevumi", icon: ListTodo },
   { href: "/settings", label: "Iestatījumi", icon: Settings },
 ];
 

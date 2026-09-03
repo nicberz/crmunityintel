@@ -27,7 +27,7 @@ export default async function ClientCalendarTabPage({
 
   const { data: calendarEventsData, error: calendarEventsError } = await supabase
     .from("calendar_events")
-    .select("*, lead:leads(name), creator:profiles(full_name)")
+    .select("*, lead:leads(name), creator:profiles(full_name, email)")
     .eq("client_id", params.id)
     .gte("start_at", gridStart.toISOString())
     .lt("start_at", addDays(gridEnd, 1).toISOString())
@@ -37,12 +37,11 @@ export default async function ClientCalendarTabPage({
   const calendarEvents: CalendarGridEvent[] = ((calendarEventsData ?? []) as any[]).map((e) => ({
     ...e,
     leadName: e.lead?.name ?? null,
-    creatorName: e.created_by ? e.creator?.full_name || "CRM lietotājs" : null,
+    creatorName: e.created_by ? e.creator?.full_name || e.creator?.email || "CRM lietotājs" : null,
   }));
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">Kalendārs</h2>
       <CalendarMonthGrid
         year={year}
         month={month}

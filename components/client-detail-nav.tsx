@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, CalendarDays, Settings } from "lucide-react";
+import { Users, CalendarDays, Settings, ListTodo } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function ClientDetailNav({ clientId }: { clientId: string }) {
@@ -11,6 +11,7 @@ export function ClientDetailNav({ clientId }: { clientId: string }) {
   const items = [
     { href: base, label: "Leadi", icon: Users },
     { href: `${base}/calendar`, label: "Kalendārs", icon: CalendarDays },
+    { href: `${base}/tasks`, label: "Uzdevumi", icon: ListTodo },
     { href: `${base}/settings`, label: "Iestatījumi", icon: Settings },
   ];
 

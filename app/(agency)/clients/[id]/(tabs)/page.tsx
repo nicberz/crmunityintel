@@ -77,8 +77,6 @@ export default async function ClientLeadsTabPage({
 
   return (
     <div className="space-y-8">
-      <h2 className="text-lg font-semibold">Leadi</h2>
-
       <LeadStatusOverview counts={statusCounts} />
 
       <LeadsFilterBar

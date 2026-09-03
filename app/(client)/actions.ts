@@ -9,7 +9,7 @@ import { parseDatesInput } from "@/lib/dates";
 import { slugifyFieldKey, parseSelectOptions, collectLeadFieldValues } from "@/lib/lead-fields";
 import { sendNewLeadWhatsAppNotification } from "@/lib/whatsapp";
 import { fetchDueReminders, type DueReminder } from "@/lib/calendar-queries";
-import { LEAD_STATUSES, type LeadFieldDefinition } from "@/lib/types";
+import { LEAD_STATUSES, TASK_STATUSES, TASK_PRIORITIES, type LeadFieldDefinition } from "@/lib/types";
 
 const addLeadSchema = z.object({
   name: z.string().trim().min(1, "Vārds ir obligāts"),
@@ -496,4 +496,102 @@ export async function dismissReminderAction(formData: FormData) {
 export async function getDueRemindersAction(): Promise<DueReminder[]> {
   await requireClientUser();
   return fetchDueReminders(createServerClient());
+}
+
+const createTaskSchema = z.object({
+  title: z.string().trim().min(1, "Nosaukums ir obligāts"),
+  description: z.string().trim().optional().or(z.literal("")),
+  assignedTo: z.string().uuid().nullish().or(z.literal("")),
+  priority: z.enum(TASK_PRIORITIES as [string, ...string[]]),
+  dueDate: z.string().trim().optional().or(z.literal("")),
+});
+
+export interface TaskFormState {
+  status: "idle" | "success" | "error";
+  message: string;
+}
+
+export async function createTaskAction(
+  _prevState: TaskFormState,
+  formData: FormData
+): Promise<TaskFormState> {
+  const profile = await requireClientUser();
+  const parseResult = createTaskSchema.safeParse({
+    title: formData.get("title"),
+    description: formData.get("description"),
+    assignedTo: formData.get("assignedTo"),
+    priority: formData.get("priority") || "medium",
+    dueDate: formData.get("dueDate"),
+  });
+  if (!parseResult.success) {
+    return { status: "error", message: parseResult.error.issues[0]?.message ?? "Nederīgi dati." };
+  }
+  const parsed = parseResult.data;
+
+  const supabase = createServerClient();
+  const { error } = await supabase.from("tasks").insert({
+    client_id: profile.client_id!,
+    created_by: profile.id,
+    assigned_to: parsed.assignedTo || null,
+    title: parsed.title,
+    description: parsed.description || null,
+    priority: parsed.priority as (typeof TASK_PRIORITIES)[number],
+    due_date: parsed.dueDate || null,
+  });
+  if (error) return { status: "error", message: error.message };
+
+  revalidatePath("/tasks");
+  return { status: "success", message: `Uzdevums "${parsed.title}" pievienots.` };
+}
+
+const updateTaskSchema = z.object({
+  taskId: z.string().uuid(),
+  status: z.enum(TASK_STATUSES as [string, ...string[]]).optional(),
+  priority: z.enum(TASK_PRIORITIES as [string, ...string[]]).optional(),
+  assignedTo: z.string().uuid().nullish().or(z.literal("")),
+});
+
+export async function updateTaskAction(formData: FormData) {
+  const profile = await requireClientUser();
+  const parsed = updateTaskSchema.parse({
+    taskId: formData.get("taskId"),
+    status: formData.get("status") || undefined,
+    priority: formData.get("priority") || undefined,
+    assignedTo: formData.has("assignedTo") ? formData.get("assignedTo") : undefined,
+  });
+
+  const updates: Record<string, unknown> = {};
+  if (parsed.status) {
+    updates.status = parsed.status;
+    updates.completed_at = parsed.status === "done" ? new Date().toISOString() : null;
+  }
+  if (parsed.priority) updates.priority = parsed.priority;
+  if (formData.has("assignedTo")) updates.assigned_to = parsed.assignedTo || null;
+
+  const supabase = createServerClient();
+  const { error } = await supabase
+    .from("tasks")
+    .update(updates)
+    .eq("id", parsed.taskId)
+    .eq("client_id", profile.client_id!);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/tasks");
+}
+
+const deleteTaskSchema = z.object({ taskId: z.string().uuid() });
+
+export async function deleteTaskAction(formData: FormData) {
+  const profile = await requireClientUser();
+  const parsed = deleteTaskSchema.parse({ taskId: formData.get("taskId") });
+
+  const supabase = createServerClient();
+  const { error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", parsed.taskId)
+    .eq("client_id", profile.client_id!);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/tasks");
 }
