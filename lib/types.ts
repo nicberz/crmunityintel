@@ -133,16 +133,19 @@ export interface Database {
         Row: ClientRow;
         Insert: Partial<ClientRow> & { name: string };
         Update: Partial<ClientRow>;
+        Relationships: [];
       };
       profiles: {
         Row: Profile;
         Insert: Partial<Profile> & { id: string };
         Update: Partial<Profile>;
+        Relationships: [];
       };
       leads: {
         Row: Lead;
         Insert: Partial<Lead> & { client_id: string };
         Update: Partial<Lead>;
+        Relationships: [];
       };
       ad_metrics_daily: {
         Row: AdMetricsDaily;
@@ -153,31 +156,37 @@ export interface Database {
           leads_count: number;
         };
         Update: Partial<AdMetricsDaily>;
+        Relationships: [];
       };
       lead_comments: {
         Row: LeadComment;
         Insert: Partial<LeadComment> & { lead_id: string; body: string };
         Update: Partial<LeadComment>;
+        Relationships: [];
       };
       lead_status_history: {
         Row: LeadStatusHistory;
         Insert: Partial<LeadStatusHistory> & { lead_id: string; new_status: LeadStatus };
         Update: Partial<LeadStatusHistory>;
+        Relationships: [];
       };
       lead_field_definitions: {
         Row: LeadFieldDefinition;
         Insert: Partial<LeadFieldDefinition> & { client_id: string; key: string; label: string };
         Update: Partial<LeadFieldDefinition>;
+        Relationships: [];
       };
       lead_field_values: {
         Row: LeadFieldValue;
         Insert: Partial<LeadFieldValue> & { lead_id: string; field_definition_id: string };
         Update: Partial<LeadFieldValue>;
+        Relationships: [];
       };
       calendar_events: {
         Row: CalendarEvent;
         Insert: Partial<CalendarEvent> & { title: string; start_at: string };
         Update: Partial<CalendarEvent>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
