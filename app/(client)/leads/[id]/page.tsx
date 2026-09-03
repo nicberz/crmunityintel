@@ -13,8 +13,9 @@ import {
   type LeadCommentWithAuthor,
   type LeadStatusHistoryEntry,
   type LeadCustomFieldValue,
+  type LeadCalendarEvent,
 } from "@/components/lead-detail";
-import type { CalendarEvent, Lead, LeadFieldDefinition, LeadFieldValue } from "@/lib/types";
+import type { Lead, LeadFieldDefinition, LeadFieldValue } from "@/lib/types";
 
 export default async function LeadDetailPage({ params }: { params: { id: string } }) {
   const profile = await requireClientUser();
@@ -29,7 +30,7 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
 
   if (!lead) notFound();
 
-  const [{ data: comments }, { data: statusHistory }, { data: fieldDefs }, { data: fieldValues }, { data: events }] =
+  const [{ data: comments }, { data: statusHistory }, { data: fieldDefs }, { data: fieldValues }, { data: events, error: eventsError }] =
     await Promise.all([
       supabase
         .from("lead_comments")
@@ -49,10 +50,11 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
       supabase.from("lead_field_values").select("*").eq("lead_id", params.id),
       supabase
         .from("calendar_events")
-        .select("*")
+        .select("*, creator:profiles(full_name)")
         .eq("lead_id", params.id)
         .order("start_at", { ascending: true }),
     ]);
+  if (eventsError) throw new Error(eventsError.message);
 
   const commentsList: LeadCommentWithAuthor[] = ((comments ?? []) as any[]).map((c) => ({
     id: c.id,
@@ -78,6 +80,11 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
     value: valuesByDefinitionId.get(def.id) ?? "",
   }));
 
+  const eventsList: LeadCalendarEvent[] = ((events ?? []) as any[]).map((e) => ({
+    ...e,
+    creatorName: e.created_by ? e.creator?.full_name || "CRM lietotājs" : null,
+  }));
+
   return (
     <div className="space-y-6">
       <div>
@@ -93,7 +100,7 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
         statusHistory={statusHistoryList}
         customFields={customFields}
         fieldDefs={(fieldDefs ?? []) as LeadFieldDefinition[]}
-        events={(events ?? []) as CalendarEvent[]}
+        events={eventsList}
         updateStatusAction={updateLeadStatusAction}
         addCommentAction={addLeadCommentAction}
         updateLeadAction={updateLeadAction}

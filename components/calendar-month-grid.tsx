@@ -13,10 +13,11 @@ import {
   startOfWeek,
 } from "date-fns";
 import { lv } from "date-fns/locale";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { CalendarEventForm } from "@/components/calendar-event-form";
 import { formatEventTime } from "@/lib/calendar";
 import { formatDate } from "@/lib/dates";
@@ -32,6 +33,7 @@ interface CalendarEventFormState {
 export interface CalendarGridEvent extends CalendarEvent {
   leadName?: string | null;
   clientName?: string | null;
+  creatorName?: string | null;
 }
 
 export function CalendarMonthGrid({
@@ -54,6 +56,16 @@ export function CalendarMonthGrid({
   deleteEventAction: (formData: FormData) => void;
 }) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [creatorFilter, setCreatorFilter] = useState<string>("all");
+
+  const creatorOptions = Array.from(
+    new Map(
+      events.filter((e) => e.created_by).map((e) => [e.created_by as string, e.creatorName || "Nezināms"])
+    ).entries()
+  );
+
+  const visibleEvents =
+    creatorFilter === "all" ? events : events.filter((e) => e.created_by === creatorFilter);
 
   const monthStart = startOfMonth(new Date(year, month - 1, 1));
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -61,7 +73,7 @@ export function CalendarMonthGrid({
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
 
   const eventsByDay = new Map<string, CalendarGridEvent[]>();
-  for (const e of events) {
+  for (const e of visibleEvents) {
     const key = format(new Date(e.start_at), "yyyy-MM-dd");
     if (!eventsByDay.has(key)) eventsByDay.set(key, []);
     eventsByDay.get(key)!.push(e);
@@ -97,6 +109,25 @@ export function CalendarMonthGrid({
           <ChevronRight className="h-5 w-5" />
         </Link>
       </div>
+
+      {creatorOptions.length > 1 && (
+        <div className="mb-4 flex items-center gap-2">
+          <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Select
+            value={creatorFilter}
+            onChange={(e) => setCreatorFilter(e.target.value)}
+            className="h-9 w-auto"
+          >
+            <option value="all">Visi ({events.length})</option>
+            {creatorOptions.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-border text-sm">
         {WEEKDAY_LABELS.map((d) => (
           <div key={d} className="bg-muted px-2 py-1 text-center text-xs font-medium text-muted-foreground">
@@ -150,6 +181,9 @@ export function CalendarMonthGrid({
                   {e.clientName && <p className="text-xs text-muted-foreground">{e.clientName}</p>}
                   {e.note && <p className="whitespace-pre-wrap text-muted-foreground">{e.note}</p>}
                   <p className="mt-1 text-xs text-muted-foreground">{formatEventTime(e.start_at)}</p>
+                  {e.creatorName && (
+                    <p className="text-xs text-muted-foreground">Pievienoja: {e.creatorName}</p>
+                  )}
                   {e.leadName && <p className="text-xs text-primary">Leads: {e.leadName}</p>}
                 </div>
                 <form action={deleteEventAction}>

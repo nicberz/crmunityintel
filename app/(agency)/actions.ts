@@ -68,7 +68,7 @@ export async function updateCommissionAction(formData: FormData) {
     .eq("id", parsed.clientId);
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
   revalidatePath("/dashboard");
 }
 
@@ -102,7 +102,7 @@ export async function addMetricsAction(formData: FormData) {
   );
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
   revalidatePath("/dashboard");
 }
 
@@ -147,7 +147,7 @@ export async function inviteClientUserAction(
     return { status: "error", message: error.message };
   }
 
-  revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
   return { status: "success", message: `Ielūgums nosūtīts uz ${parsed.email}.` };
 }
 
@@ -185,7 +185,7 @@ export async function generateClientApiKeyAction(
     return { status: "error", message: error.message };
   }
 
-  revalidatePath(`/clients/${parseResult.data.clientId}`);
+  revalidatePath(`/clients/${parseResult.data.clientId}/settings`);
   return { status: "success", message: "Atslēga izveidota. Saglabā to tagad — otrreiz tā netiks parādīta.", apiKey: raw };
 }
 
@@ -376,7 +376,7 @@ export async function updateClientWhatsAppAction(
     .eq("id", parsed.clientId);
   if (error) return { status: "error", message: error.message };
 
-  revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
   return { status: "success", message: "WhatsApp numurs saglabāts." };
 }
 
@@ -430,6 +430,7 @@ export async function addLeadFieldAction(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
   revalidatePath("/clients/[id]/leads/[leadId]", "page");
 }
 
@@ -471,6 +472,7 @@ export async function updateLeadFieldAction(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
   revalidatePath("/clients/[id]/leads/[leadId]", "page");
 }
 
@@ -491,6 +493,7 @@ export async function deleteLeadFieldAction(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
   revalidatePath("/clients/[id]/leads/[leadId]", "page");
 }
 
@@ -650,7 +653,7 @@ export async function createCalendarEventAction(
 
   revalidatePath("/calendar");
   if (parsed.clientId) {
-    revalidatePath(`/clients/${parsed.clientId}`);
+    revalidatePath(`/clients/${parsed.clientId}/calendar`);
     if (parsed.leadId) revalidatePath(`/clients/${parsed.clientId}/leads/${parsed.leadId}`);
   }
 

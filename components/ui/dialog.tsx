@@ -31,7 +31,7 @@ export function Dialog({
       onClick={onClose}
     >
       <div
-        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-background shadow-lg"
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border p-4">

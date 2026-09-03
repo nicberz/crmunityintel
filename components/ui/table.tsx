@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-auto rounded-md border border-border">
+    <div className="w-full overflow-auto rounded-md border border-border bg-card shadow-sm shadow-black/[0.03]">
       <table className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   );

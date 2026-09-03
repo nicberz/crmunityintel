@@ -35,6 +35,10 @@ export interface LeadCustomFieldValue {
   value: string;
 }
 
+export interface LeadCalendarEvent extends CalendarEvent {
+  creatorName?: string | null;
+}
+
 export function LeadDetail({
   lead,
   comments,
@@ -52,7 +56,7 @@ export function LeadDetail({
   statusHistory: LeadStatusHistoryEntry[];
   customFields: LeadCustomFieldValue[];
   fieldDefs: LeadFieldDefinition[];
-  events: CalendarEvent[];
+  events: LeadCalendarEvent[];
   updateStatusAction: (formData: FormData) => void;
   addCommentAction: (formData: FormData) => void;
   updateLeadAction: (formData: FormData) => void;
@@ -141,6 +145,9 @@ export function LeadDetail({
               <p className="font-medium">{e.title}</p>
               {e.note && <p className="whitespace-pre-wrap text-muted-foreground">{e.note}</p>}
               <p className="mt-1 text-xs text-muted-foreground">{formatEventTime(e.start_at)}</p>
+              {e.creatorName && (
+                <p className="text-xs text-muted-foreground">Pievienoja: {e.creatorName}</p>
+              )}
             </li>
           ))}
           {events.length === 0 && (

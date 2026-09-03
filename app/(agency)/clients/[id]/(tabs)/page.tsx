@@ -1,18 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireClientUser } from "@/lib/auth";
 import {
   addLeadAction,
-  importLeadsCsvAction,
-  updateLeadStatusAction,
   bulkUpdateLeadStatusAction,
   bulkDeleteLeadsAction,
-} from "@/app/(client)/actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+} from "@/app/(agency)/actions";
+import { LeadStatusOverview } from "@/components/lead-status-overview";
 import { AddLeadForm } from "@/components/add-lead-form";
 import { LeadsFilterBar } from "@/components/leads-filter-bar";
 import { LeadsTable } from "@/components/leads-table";
+import { tallyLeadStatuses } from "@/lib/lead-stats";
 import type { Lead, LeadFieldDefinition, LeadFieldValue } from "@/lib/types";
 
 function param(searchParams: Record<string, string | string[] | undefined>, key: string): string | undefined {
@@ -20,12 +16,13 @@ function param(searchParams: Record<string, string | string[] | undefined>, key:
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-export default async function LeadsPage({
+export default async function ClientLeadsTabPage({
+  params,
   searchParams,
 }: {
+  params: { id: string };
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const profile = await requireClientUser();
   const supabase = createClient();
 
   const statusFilter = param(searchParams, "status");
@@ -34,23 +31,25 @@ export default async function LeadsPage({
   const sortColumn = param(searchParams, "sort") === "status" ? "status" : "created_at";
   const sortAscending = param(searchParams, "dir") === "asc";
 
-  let leadsQuery = supabase.from("leads").select("*").eq("client_id", profile.client_id!);
+  let leadsQuery = supabase.from("leads").select("*").eq("client_id", params.id);
   if (statusFilter) leadsQuery = leadsQuery.eq("status", statusFilter as Lead["status"]);
   if (fromFilter) leadsQuery = leadsQuery.gte("created_at", fromFilter);
   if (toFilter) leadsQuery = leadsQuery.lte("created_at", `${toFilter}T23:59:59.999`);
   leadsQuery = leadsQuery.order(sortColumn, { ascending: sortAscending });
 
-  const [{ data: leads }, { data: fieldDefsData }] = await Promise.all([
+  const [{ data: leads }, { data: leadStatuses }, { data: fieldDefsData }] = await Promise.all([
     leadsQuery,
+    supabase.from("leads").select("status").eq("client_id", params.id),
     supabase
       .from("lead_field_definitions")
       .select("*")
-      .eq("client_id", profile.client_id!)
+      .eq("client_id", params.id)
       .order("sort_order", { ascending: true }),
   ]);
 
   const leadsList = (leads ?? []) as Lead[];
   const fieldDefs = (fieldDefsData ?? []) as LeadFieldDefinition[];
+  const statusCounts = tallyLeadStatuses(((leadStatuses ?? []) as Pick<Lead, "status">[]).map((l) => l.status));
 
   const leadIds = leadsList.map((l) => l.id);
   const { data: fieldValuesData } = leadIds.length
@@ -71,56 +70,40 @@ export default async function LeadsPage({
     if (toFilter) qs.set("to", toFilter);
     qs.set("sort", column);
     qs.set("dir", nextDir);
-    return `/leads?${qs.toString()}`;
+    return `/clients/${params.id}?${qs.toString()}`;
   }
 
   const hasActiveFilters = Boolean(statusFilter || fromFilter || toFilter);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Leadi</h1>
-        <p className="text-muted-foreground">Visi tavi leadi vienuviet, ar statusa izsekošanu.</p>
-      </div>
+      <h2 className="text-lg font-semibold">Leadi</h2>
 
-      <Card className="max-w-xl">
-        <CardHeader>
-          <CardTitle>Importēt no CSV</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Faila kolonnas: <code>name</code> (obligāta), <code>email</code>, <code>phone</code>.
-          </p>
-          <form action={importLeadsCsvAction} className="space-y-3">
-            <Input name="file" type="file" accept=".csv,text/csv" required />
-            <Button type="submit" variant="outline">
-              Importēt
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <LeadStatusOverview counts={statusCounts} />
 
       <LeadsFilterBar
         key={`${statusFilter ?? ""}|${fromFilter ?? ""}|${toFilter ?? ""}`}
-        basePath="/leads"
+        basePath={`/clients/${params.id}`}
         status={statusFilter}
         from={fromFilter}
         to={toFilter}
         sort={sortColumn}
         dir={sortAscending ? "asc" : "desc"}
-        addLeadForm={<AddLeadForm fieldDefs={fieldDefs} action={addLeadAction} />}
+        addLeadForm={
+          <AddLeadForm fieldDefs={fieldDefs} hiddenFields={{ clientId: params.id }} action={addLeadAction} />
+        }
       >
         <LeadsTable
           leads={leadsList}
           fieldDefs={fieldDefs}
           fieldValues={fieldValues}
-          detailHrefBase="/leads"
+          detailHrefBase={`/clients/${params.id}/leads`}
           sortLinks={{ status: sortLink("status"), created_at: sortLink("created_at") }}
-          showSourceColumn
-          editableStatus
+          showSourceColumn={false}
+          editableStatus={false}
           hasActiveFilters={hasActiveFilters}
-          emptyMessage="Vēl nav neviena leada. Pievieno pirmo augstāk vai importē CSV failu."
-          updateStatusAction={updateLeadStatusAction}
+          emptyMessage="Šim klientam vēl nav leadu."
+          clientId={params.id}
           bulkUpdateStatusAction={bulkUpdateLeadStatusAction}
           bulkDeleteAction={bulkDeleteLeadsAction}
         />
