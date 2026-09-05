@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { updateClientNameAction, deleteClientAction } from "@/app/(agency)/actions";
+import { ClientListRow } from "@/components/client-list-row";
 import type { Client } from "@/lib/types";
 
 export default async function AgencyDashboardPage() {
@@ -17,14 +18,12 @@ export default async function AgencyDashboardPage() {
 
       <div className="max-w-md space-y-2">
         {clientList.map((client) => (
-          <Link
+          <ClientListRow
             key={client.id}
-            href={`/clients/${client.id}`}
-            className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium shadow-sm shadow-black/[0.03] hover:bg-muted/40"
-          >
-            {client.name}
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Link>
+            client={client}
+            updateNameAction={updateClientNameAction}
+            deleteAction={deleteClientAction}
+          />
         ))}
         {clientList.length === 0 && (
           <p className="text-sm text-muted-foreground">

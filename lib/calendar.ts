@@ -7,10 +7,10 @@ export function reminderFireTime(startAt: string | Date, minutesBefore: number):
 }
 
 export function isReminderDue(
-  event: Pick<CalendarEvent, "reminder_enabled" | "reminder_dismissed_at" | "start_at" | "reminder_minutes_before">,
+  event: Pick<CalendarEvent, "reminder_enabled" | "start_at" | "reminder_minutes_before">,
   now: Date = new Date()
 ): boolean {
-  if (!event.reminder_enabled || event.reminder_dismissed_at) return false;
+  if (!event.reminder_enabled) return false;
   return now >= reminderFireTime(event.start_at, event.reminder_minutes_before);
 }
 

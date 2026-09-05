@@ -32,6 +32,41 @@ export async function createClientAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+const updateClientNameSchema = z.object({
+  clientId: z.string().uuid(),
+  name: z.string().trim().min(1, "Nosaukums ir obligāts"),
+});
+
+export async function updateClientNameAction(formData: FormData) {
+  await requireAgencyAdmin();
+  const parsed = updateClientNameSchema.parse({
+    clientId: formData.get("clientId"),
+    name: formData.get("name"),
+  });
+
+  const supabase = createServerClient();
+  const { error } = await supabase.from("clients").update({ name: parsed.name }).eq("id", parsed.clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${parsed.clientId}`);
+}
+
+const deleteClientSchema = z.object({ clientId: z.string().uuid() });
+
+export async function deleteClientAction(formData: FormData) {
+  await requireAgencyAdmin();
+  const parsed = deleteClientSchema.parse({ clientId: formData.get("clientId") });
+
+  const supabase = createServerClient();
+  const { error } = await supabase.from("clients").delete().eq("id", parsed.clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/clients");
+}
+
 const updateCommissionSchema = z.discriminatedUnion("commissionType", [
   z.object({
     clientId: z.string().uuid(),
@@ -676,20 +711,19 @@ export async function deleteCalendarEventAction(formData: FormData) {
 const dismissReminderSchema = z.object({ eventId: z.string().uuid() });
 
 export async function dismissReminderAction(formData: FormData) {
-  await requireAgencyAdmin();
+  const profile = await requireAgencyAdmin();
   const parsed = dismissReminderSchema.parse({ eventId: formData.get("eventId") });
 
   const supabase = createServerClient();
   const { error } = await supabase
-    .from("calendar_events")
-    .update({ reminder_dismissed_at: new Date().toISOString() })
-    .eq("id", parsed.eventId);
+    .from("reminder_dismissals")
+    .upsert({ event_id: parsed.eventId, user_id: profile.id }, { onConflict: "event_id,user_id" });
   if (error) throw new Error(error.message);
 }
 
 export async function getDueRemindersAction(): Promise<DueReminder[]> {
-  await requireAgencyAdmin();
-  return fetchDueReminders(createServerClient());
+  const profile = await requireAgencyAdmin();
+  return fetchDueReminders(createServerClient(), profile.id);
 }
 
 const createTaskSchema = z.object({

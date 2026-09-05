@@ -11,16 +11,21 @@ export interface DueReminder {
 }
 
 export async function fetchDueReminders(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string
 ): Promise<DueReminder[]> {
-  const { data } = await supabase
-    .from("calendar_events")
-    .select("id, title, start_at, client_id, lead_id, reminder_enabled, reminder_dismissed_at, reminder_minutes_before, lead:leads(name)")
-    .eq("reminder_enabled", true)
-    .is("reminder_dismissed_at", null);
+  const [{ data }, { data: dismissals }] = await Promise.all([
+    supabase
+      .from("calendar_events")
+      .select("id, title, start_at, client_id, lead_id, reminder_enabled, reminder_minutes_before, lead:leads(name)")
+      .eq("reminder_enabled", true),
+    supabase.from("reminder_dismissals").select("event_id").eq("user_id", userId),
+  ]);
+
+  const dismissedIds = new Set(((dismissals ?? []) as { event_id: string }[]).map((d) => d.event_id));
 
   return ((data ?? []) as any[])
-    .filter((e) => isReminderDue(e))
+    .filter((e) => !dismissedIds.has(e.id) && isReminderDue(e))
     .sort(
       (a, b) =>
         reminderFireTime(a.start_at, a.reminder_minutes_before).getTime() -

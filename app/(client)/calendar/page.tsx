@@ -27,7 +27,7 @@ export default async function CalendarPage({
 
   const { data: eventsData, error: eventsError } = await supabase
     .from("calendar_events")
-    .select("*, lead:leads(name), creator:profiles(full_name, email)")
+    .select("*, lead:leads(name), creator:profiles!created_by(full_name, email)")
     .eq("client_id", profile.client_id!)
     .gte("start_at", gridStart.toISOString())
     .lt("start_at", addDays(gridEnd, 1).toISOString())

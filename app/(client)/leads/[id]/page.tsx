@@ -50,7 +50,7 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
       supabase.from("lead_field_values").select("*").eq("lead_id", params.id),
       supabase
         .from("calendar_events")
-        .select("*, creator:profiles(full_name, email)")
+        .select("*, creator:profiles!created_by(full_name, email)")
         .eq("lead_id", params.id)
         .order("start_at", { ascending: true }),
     ]);

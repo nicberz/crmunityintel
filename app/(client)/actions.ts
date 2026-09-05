@@ -486,16 +486,14 @@ export async function dismissReminderAction(formData: FormData) {
 
   const supabase = createServerClient();
   const { error } = await supabase
-    .from("calendar_events")
-    .update({ reminder_dismissed_at: new Date().toISOString() })
-    .eq("id", parsed.eventId)
-    .eq("client_id", profile.client_id!);
+    .from("reminder_dismissals")
+    .upsert({ event_id: parsed.eventId, user_id: profile.id }, { onConflict: "event_id,user_id" });
   if (error) throw new Error(error.message);
 }
 
 export async function getDueRemindersAction(): Promise<DueReminder[]> {
-  await requireClientUser();
-  return fetchDueReminders(createServerClient());
+  const profile = await requireClientUser();
+  return fetchDueReminders(createServerClient(), profile.id);
 }
 
 const createTaskSchema = z.object({
