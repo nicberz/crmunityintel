@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TaskColorDot, TaskGroupBadge } from "@/components/ui/badge";
+import { TaskDetailsDialog } from "@/components/task-details-dialog";
 import { formatDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +15,7 @@ import {
   TASK_PRIORITIES,
   TASK_PRIORITY_LABELS,
   type Task,
+  type TaskGroup,
 } from "@/lib/types";
 
 export interface TaskWithNames extends Task {
@@ -21,23 +25,37 @@ export interface TaskWithNames extends Task {
 export function TasksTable({
   tasks,
   teamMembers,
+  groups = [],
   hiddenFields = {},
   updateAction,
   deleteAction,
 }: {
   tasks: TaskWithNames[];
   teamMembers: { id: string; name: string }[];
+  groups?: TaskGroup[];
   hiddenFields?: Record<string, string>;
   updateAction: (formData: FormData) => void;
   deleteAction: (formData: FormData) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  const [selectedTask, setSelectedTask] = useState<TaskWithNames | null>(null);
+
+  function toggleDone(task: TaskWithNames, done: boolean) {
+    const formData = new FormData();
+    formData.set("taskId", task.id);
+    formData.set("status", done ? "done" : "todo");
+    for (const [k, v] of Object.entries(hiddenFields)) formData.set(k, v);
+    updateAction(formData);
+  }
 
   return (
+    <>
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-10" />
           <TableHead>Nosaukums</TableHead>
+          <TableHead>Grupa</TableHead>
           <TableHead>Atbildīgais</TableHead>
           <TableHead>Prioritāte</TableHead>
           <TableHead>Termiņš</TableHead>
@@ -48,15 +66,42 @@ export function TasksTable({
       <TableBody>
         {tasks.map((task) => {
           const overdue = Boolean(task.due_date) && task.due_date! < today && task.status !== "done";
+          const group = task.group_id ? groups.find((g) => g.id === task.group_id) ?? null : null;
           return (
             <TableRow key={task.id}>
+              <TableCell>
+                <input
+                  type="checkbox"
+                  checked={task.status === "done"}
+                  onChange={(e) => toggleDone(task, e.target.checked)}
+                  aria-label="Pabeigts"
+                  className="h-4 w-4"
+                />
+              </TableCell>
               <TableCell className="max-w-xs">
-                <p className={cn("font-medium", task.status === "done" && "text-muted-foreground line-through")}>
-                  {task.title}
-                </p>
-                {task.description && (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.description}</p>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTask(task)}
+                  className="flex items-start gap-1.5 text-left"
+                >
+                  <TaskColorDot color={task.color} className="mt-1.5" />
+                  <span>
+                    <p
+                      className={cn(
+                        "font-medium hover:underline",
+                        task.status === "done" && "text-muted-foreground line-through"
+                      )}
+                    >
+                      {task.title}
+                    </p>
+                    {task.description && (
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.description}</p>
+                    )}
+                  </span>
+                </button>
+              </TableCell>
+              <TableCell>
+                {group ? <TaskGroupBadge name={group.name} color={group.color} /> : "—"}
               </TableCell>
               <TableCell>
                 <form action={updateAction}>
@@ -138,12 +183,22 @@ export function TasksTable({
         })}
         {tasks.length === 0 && (
           <TableRow>
-            <TableCell colSpan={6} className="text-center text-muted-foreground">
+            <TableCell colSpan={8} className="text-center text-muted-foreground">
               Vēl nav neviena uzdevuma.
             </TableCell>
           </TableRow>
         )}
       </TableBody>
     </Table>
+    <TaskDetailsDialog
+      task={selectedTask}
+      open={selectedTask !== null}
+      onClose={() => setSelectedTask(null)}
+      teamMembers={teamMembers}
+      groups={groups}
+      hiddenFields={hiddenFields}
+      updateAction={updateAction}
+    />
+    </>
   );
 }

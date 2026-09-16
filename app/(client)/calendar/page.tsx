@@ -1,8 +1,12 @@
-import { addDays, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
+import { addDays, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { requireClientUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createCalendarEventAction, deleteCalendarEventAction } from "@/app/(client)/actions";
-import { CalendarMonthGrid, type CalendarGridEvent } from "@/components/calendar-month-grid";
+import {
+  createCalendarEventAction,
+  deleteCalendarEventAction,
+  updateTaskAction,
+} from "@/app/(client)/actions";
+import { CalendarMonthGrid, type CalendarGridEvent, type CalendarGridTask } from "@/components/calendar-month-grid";
 
 function param(searchParams: Record<string, string | string[] | undefined>, key: string): string | undefined {
   const value = searchParams[key];
@@ -25,19 +29,40 @@ export default async function CalendarPage({
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(monthStart), { weekStartsOn: 1 });
 
-  const { data: eventsData, error: eventsError } = await supabase
-    .from("calendar_events")
-    .select("*, lead:leads(name), creator:profiles!created_by(full_name, email)")
-    .eq("client_id", profile.client_id!)
-    .gte("start_at", gridStart.toISOString())
-    .lt("start_at", addDays(gridEnd, 1).toISOString())
-    .order("start_at", { ascending: true });
+  const [{ data: eventsData, error: eventsError }, { data: tasksData, error: tasksError }] = await Promise.all([
+    supabase
+      .from("calendar_events")
+      .select("*, lead:leads(name), creator:profiles!created_by(full_name, email)")
+      .eq("client_id", profile.client_id!)
+      .gte("start_at", gridStart.toISOString())
+      .lt("start_at", addDays(gridEnd, 1).toISOString())
+      .order("start_at", { ascending: true }),
+    supabase
+      .from("tasks")
+      .select("id, title, due_date, color, status, assigned_to, assignee:profiles!assigned_to(full_name, email)")
+      .eq("client_id", profile.client_id!)
+      .is("archived_at", null)
+      .not("due_date", "is", null)
+      .gte("due_date", format(gridStart, "yyyy-MM-dd"))
+      .lte("due_date", format(gridEnd, "yyyy-MM-dd")),
+  ]);
   if (eventsError) throw new Error(eventsError.message);
+  if (tasksError) throw new Error(tasksError.message);
 
   const events: CalendarGridEvent[] = ((eventsData ?? []) as any[]).map((e) => ({
     ...e,
     leadName: e.lead?.name ?? null,
     creatorName: e.created_by ? e.creator?.full_name || e.creator?.email || "CRM lietotājs" : null,
+  }));
+
+  const tasks: CalendarGridTask[] = ((tasksData ?? []) as any[]).map((t) => ({
+    id: t.id,
+    title: t.title,
+    due_date: t.due_date,
+    color: t.color,
+    status: t.status,
+    assigneeId: t.assigned_to,
+    assigneeName: t.assigned_to ? t.assignee?.full_name || t.assignee?.email || "CRM lietotājs" : null,
   }));
 
   return (
@@ -51,9 +76,11 @@ export default async function CalendarPage({
         year={year}
         month={month}
         events={events}
+        tasks={tasks}
         basePath="/calendar"
         createEventAction={createCalendarEventAction}
         deleteEventAction={deleteCalendarEventAction}
+        updateTaskAction={updateTaskAction}
       />
     </div>
   );

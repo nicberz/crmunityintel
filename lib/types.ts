@@ -127,6 +127,10 @@ export interface CalendarEvent {
 
 export type TaskStatus = "todo" | "in_progress" | "done";
 export type TaskPriority = "low" | "medium" | "high";
+// Free-form hex color (e.g. "#33417a"), chosen via a color input rather than a fixed palette.
+export type TaskColor = string;
+
+export const DEFAULT_TASK_COLOR = "#9aa0ac";
 
 export const TASK_STATUSES: TaskStatus[] = ["todo", "in_progress", "done"];
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
@@ -151,8 +155,57 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   priority: TaskPriority;
+  color: TaskColor;
+  group_id: string | null;
   due_date: string | null;
   completed_at: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskGroup {
+  id: string;
+  client_id: string;
+  name: string;
+  color: TaskColor;
+  created_at: string;
+}
+
+export type BugReportSeverity = "low" | "medium" | "high" | "critical";
+export type BugReportStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export const BUG_REPORT_SEVERITIES: BugReportSeverity[] = ["low", "medium", "high", "critical"];
+export const BUG_REPORT_SEVERITY_LABELS: Record<BugReportSeverity, string> = {
+  low: "Zema",
+  medium: "Vidēja",
+  high: "Augsta",
+  critical: "Kritiska",
+};
+export const BUG_REPORT_SEVERITY_CLASSES: Record<BugReportSeverity, string> = {
+  low: "bg-gray-100 text-gray-800",
+  medium: "bg-amber-100 text-amber-800",
+  high: "bg-orange-100 text-orange-800",
+  critical: "bg-red-100 text-red-800",
+};
+
+export const BUG_REPORT_STATUSES: BugReportStatus[] = ["open", "in_progress", "resolved", "closed"];
+export const BUG_REPORT_STATUS_LABELS: Record<BugReportStatus, string> = {
+  open: "Atvērts",
+  in_progress: "Notiek",
+  resolved: "Atrisināts",
+  closed: "Aizvērts",
+};
+
+export interface BugReport {
+  id: string;
+  reported_by: string | null;
+  reporter_role: UserRole | null;
+  page_path: string | null;
+  title: string;
+  description: string;
+  severity: BugReportSeverity;
+  status: BugReportStatus;
   created_at: string;
   updated_at: string;
 }
@@ -219,6 +272,24 @@ export interface Database {
         Row: CalendarEvent;
         Insert: Partial<CalendarEvent> & { title: string; start_at: string };
         Update: Partial<CalendarEvent>;
+        Relationships: [];
+      };
+      tasks: {
+        Row: Task;
+        Insert: Partial<Task> & { client_id: string; title: string };
+        Update: Partial<Task>;
+        Relationships: [];
+      };
+      task_groups: {
+        Row: TaskGroup;
+        Insert: Partial<TaskGroup> & { client_id: string; name: string };
+        Update: Partial<TaskGroup>;
+        Relationships: [];
+      };
+      bug_reports: {
+        Row: BugReport;
+        Insert: Partial<BugReport> & { title: string; description: string };
+        Update: Partial<BugReport>;
         Relationships: [];
       };
     };

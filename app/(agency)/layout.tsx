@@ -6,6 +6,7 @@ import { getDueRemindersAction, dismissReminderAction } from "@/app/(agency)/act
 const navItems = [
   { href: "/dashboard", label: "Pārskats" },
   { href: "/clients", label: "Klienti" },
+  { href: "/bug-reports", label: "Kļūdu ziņojumi" },
 ];
 
 export default async function AgencyLayout({ children }: { children: React.ReactNode }) {

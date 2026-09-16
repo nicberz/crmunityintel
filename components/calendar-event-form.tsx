@@ -35,19 +35,31 @@ export function CalendarEventForm({
   const [state, formAction] = useFormState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
   const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [localStartAt, setLocalStartAt] = useState(defaultStartAt ?? "");
 
   useEffect(() => {
     if (state.status === "success") {
       formRef.current?.reset();
       setReminderEnabled(true);
+      setLocalStartAt(defaultStartAt ?? "");
     }
-  }, [state]);
+  }, [state, defaultStartAt]);
+
+  // `datetime-local` has no timezone info. Converting it to UTC must happen here,
+  // in the browser, where the user's real local timezone is known — doing it in
+  // the server action instead uses the server's timezone and shifts the time.
+  const startAtUtc = (() => {
+    if (!localStartAt) return "";
+    const d = new Date(localStartAt);
+    return isNaN(d.getTime()) ? "" : d.toISOString();
+  })();
 
   return (
     <form ref={formRef} action={formAction} className="space-y-3">
       {Object.entries(hiddenFields).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}
+      <input type="hidden" name="startAt" value={startAtUtc} />
       <div className="space-y-1.5">
         <Label htmlFor="event-title">Nosaukums</Label>
         <Input id="event-title" name="title" required placeholder="Piezvanīt Annai" />
@@ -60,10 +72,10 @@ export function CalendarEventForm({
         <Label htmlFor="event-startAt">Datums un laiks</Label>
         <Input
           id="event-startAt"
-          name="startAt"
           type="datetime-local"
           required
-          defaultValue={defaultStartAt}
+          value={localStartAt}
+          onChange={(e) => setLocalStartAt(e.target.value)}
         />
       </div>
       <div className="flex flex-wrap items-end gap-3">

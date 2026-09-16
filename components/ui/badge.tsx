@@ -1,6 +1,11 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
-import type { LeadStatus } from "@/lib/types";
+import { cn, getContrastTextColor } from "@/lib/utils";
+import {
+  BUG_REPORT_SEVERITY_CLASSES,
+  type LeadStatus,
+  type TaskColor,
+  type BugReportSeverity,
+} from "@/lib/types";
 
 const statusClasses: Record<LeadStatus, string> = {
   call_back: "bg-blue-100 text-blue-800",
@@ -24,4 +29,23 @@ export function Badge({ className, ...props }: React.HTMLAttributes<HTMLSpanElem
 
 export function LeadStatusBadge({ status, label }: { status: LeadStatus; label: string }) {
   return <Badge className={statusClasses[status]}>{label}</Badge>;
+}
+
+export function TaskColorDot({ color, className }: { color: TaskColor; className?: string }) {
+  return (
+    <span
+      className={cn("inline-block h-2.5 w-2.5 shrink-0 rounded-full", className)}
+      style={{ backgroundColor: color }}
+    />
+  );
+}
+
+export function TaskGroupBadge({ name, color }: { name: string; color: TaskColor }) {
+  return (
+    <Badge style={{ backgroundColor: color, color: getContrastTextColor(color) }}>{name}</Badge>
+  );
+}
+
+export function BugSeverityBadge({ severity, label }: { severity: BugReportSeverity; label: string }) {
+  return <Badge className={BUG_REPORT_SEVERITY_CLASSES[severity]}>{label}</Badge>;
 }

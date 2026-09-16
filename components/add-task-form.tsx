@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { TASK_PRIORITIES, TASK_PRIORITY_LABELS } from "@/lib/types";
+import { ColorSwatchPicker } from "@/components/color-swatch-picker";
+import { TASK_PRIORITIES, TASK_PRIORITY_LABELS, DEFAULT_TASK_COLOR, type TaskGroup } from "@/lib/types";
 
 interface TaskFormState {
   status: "idle" | "success" | "error";
@@ -27,19 +28,23 @@ function SubmitButton() {
 
 export function AddTaskForm({
   teamMembers,
+  groups = [],
   hiddenFields = {},
   action,
 }: {
   teamMembers: { id: string; name: string }[];
+  groups?: TaskGroup[];
   hiddenFields?: Record<string, string>;
   action: (prevState: TaskFormState, formData: FormData) => Promise<TaskFormState>;
 }) {
   const [state, formAction] = useFormState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const [color, setColor] = useState(DEFAULT_TASK_COLOR);
 
   useEffect(() => {
     if (state.status === "success") {
       formRef.current?.reset();
+      setColor(DEFAULT_TASK_COLOR);
     }
   }, [state]);
 
@@ -56,7 +61,7 @@ export function AddTaskForm({
         <Label htmlFor="task-description">Apraksts</Label>
         <Textarea id="task-description" name="description" placeholder="Neobligāti" rows={2} />
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="space-y-1.5">
           <Label htmlFor="task-assignedTo">Atbildīgais</Label>
           <Select id="task-assignedTo" name="assignedTo" defaultValue="">
@@ -79,9 +84,24 @@ export function AddTaskForm({
           </Select>
         </div>
         <div className="space-y-1.5">
+          <Label htmlFor="task-groupId">Grupa</Label>
+          <Select id="task-groupId" name="groupId" defaultValue="">
+            <option value="">Nav grupas</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="space-y-1.5">
           <Label htmlFor="task-dueDate">Termiņš</Label>
           <Input id="task-dueDate" name="dueDate" type="date" />
         </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Krāsa</Label>
+        <ColorSwatchPicker name="color" value={color} onChange={setColor} />
       </div>
       <div className="flex items-center gap-3">
         <SubmitButton />

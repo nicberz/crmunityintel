@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { ReportBugButton } from "@/components/report-bug-button";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -85,6 +86,7 @@ export function AppShell({
           </header>
           <main className="flex-1 px-6 py-8">{children}</main>
         </div>
+        <ReportBugButton />
       </div>
     );
   }
@@ -123,6 +125,7 @@ export function AppShell({
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <ReportBugButton />
     </div>
   );
 }

@@ -1,25 +1,67 @@
+import { ListTodo } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { createTaskAction, updateTaskAction, deleteTaskAction } from "@/app/(agency)/actions";
+import {
+  createTaskAction,
+  updateTaskAction,
+  deleteTaskAction,
+  createTaskGroupAction,
+  deleteTaskGroupAction,
+} from "@/app/(agency)/actions";
 import { AddTaskForm } from "@/components/add-task-form";
 import { TasksTable, type TaskWithNames } from "@/components/tasks-table";
-import type { Task } from "@/lib/types";
+import { TasksFilterBar } from "@/components/tasks-filter-bar";
+import { TaskGroupsManager } from "@/components/task-groups-manager";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import type { Task, TaskGroup } from "@/lib/types";
 
-export default async function ClientTasksTabPage({ params }: { params: { id: string } }) {
+function param(searchParams: Record<string, string | string[] | undefined>, key: string): string | undefined {
+  const value = searchParams[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export default async function ClientTasksTabPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   const supabase = createClient();
 
-  const [{ data: tasksData }, { data: teamData }] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select("*")
-      .eq("client_id", params.id)
-      .order("due_date", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false }),
+  const filters = {
+    status: param(searchParams, "status"),
+    priority: param(searchParams, "priority"),
+    assignedTo: param(searchParams, "assignedTo"),
+    groupId: param(searchParams, "groupId"),
+    archived: param(searchParams, "archived"),
+  };
+
+  let tasksQuery = supabase.from("tasks").select("*").eq("client_id", params.id);
+  if (filters.archived === "1") {
+    tasksQuery = tasksQuery.not("archived_at", "is", null);
+  } else {
+    tasksQuery = tasksQuery.is("archived_at", null);
+  }
+  if (filters.status) tasksQuery = tasksQuery.eq("status", filters.status);
+  if (filters.priority) tasksQuery = tasksQuery.eq("priority", filters.priority);
+  if (filters.assignedTo) tasksQuery = tasksQuery.eq("assigned_to", filters.assignedTo);
+  if (filters.groupId) tasksQuery = tasksQuery.eq("group_id", filters.groupId);
+  tasksQuery = tasksQuery
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  const [{ data: tasksData }, { data: teamData }, { data: groupsData }] = await Promise.all([
+    tasksQuery,
     supabase
       .from("profiles")
       .select("id, full_name, email")
       .eq("client_id", params.id)
-      .eq("role", "client_user")
       .order("full_name", { ascending: true }),
+    supabase
+      .from("task_groups")
+      .select("*")
+      .eq("client_id", params.id)
+      .order("name", { ascending: true }),
   ]);
 
   const teamMembers = ((teamData ?? []) as any[]).map((p) => ({
@@ -27,6 +69,7 @@ export default async function ClientTasksTabPage({ params }: { params: { id: str
     name: (p.full_name || p.email || "Bez vārda") as string,
   }));
   const nameById = new Map(teamMembers.map((m) => [m.id, m.name]));
+  const groups = (groupsData ?? []) as TaskGroup[];
 
   const tasks: TaskWithNames[] = ((tasksData ?? []) as Task[]).map((t) => ({
     ...t,
@@ -38,14 +81,32 @@ export default async function ClientTasksTabPage({ params }: { params: { id: str
       <div className="max-w-xl rounded-lg border border-border bg-card p-6 shadow-sm shadow-black/[0.03]">
         <AddTaskForm
           teamMembers={teamMembers}
+          groups={groups}
           hiddenFields={{ clientId: params.id }}
           action={createTaskAction}
         />
       </div>
 
+      <CollapsibleSection icon={ListTodo} title="Uzdevumu grupas">
+        <TaskGroupsManager
+          groups={groups}
+          hiddenFields={{ clientId: params.id }}
+          createAction={createTaskGroupAction}
+          deleteAction={deleteTaskGroupAction}
+        />
+      </CollapsibleSection>
+
+      <TasksFilterBar
+        basePath={`/clients/${params.id}/tasks`}
+        filters={filters}
+        teamMembers={teamMembers}
+        groups={groups}
+      />
+
       <TasksTable
         tasks={tasks}
         teamMembers={teamMembers}
+        groups={groups}
         hiddenFields={{ clientId: params.id }}
         updateAction={updateTaskAction}
         deleteAction={deleteTaskAction}

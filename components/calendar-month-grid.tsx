@@ -18,10 +18,11 @@ import { cn } from "@/lib/utils";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { TaskColorDot } from "@/components/ui/badge";
 import { CalendarEventForm } from "@/components/calendar-event-form";
 import { formatEventTime } from "@/lib/calendar";
 import { formatDate } from "@/lib/dates";
-import type { CalendarEvent } from "@/lib/types";
+import type { CalendarEvent, TaskColor, TaskStatus } from "@/lib/types";
 
 const WEEKDAY_LABELS = ["Pr", "Ot", "Tr", "Ce", "Pk", "Se", "Sv"];
 
@@ -36,36 +37,69 @@ export interface CalendarGridEvent extends CalendarEvent {
   creatorName?: string | null;
 }
 
+export interface CalendarGridTask {
+  id: string;
+  title: string;
+  due_date: string;
+  color: TaskColor;
+  status: TaskStatus;
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+}
+
+type TypeFilter = "all" | "events" | "tasks";
+
 export function CalendarMonthGrid({
   year,
   month,
   events,
+  tasks = [],
   basePath,
   paramNames = { year: "year", month: "month" },
   hiddenFields = {},
+  taskHiddenFields = {},
   createEventAction,
   deleteEventAction,
+  updateTaskAction,
 }: {
   year: number;
   month: number;
   events: CalendarGridEvent[];
+  tasks?: CalendarGridTask[];
   basePath: string;
   paramNames?: { year: string; month: string };
   hiddenFields?: Record<string, string>;
+  taskHiddenFields?: Record<string, string>;
   createEventAction: (prevState: CalendarEventFormState, formData: FormData) => Promise<CalendarEventFormState>;
   deleteEventAction: (formData: FormData) => void;
+  updateTaskAction?: (formData: FormData) => void;
 }) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [creatorFilter, setCreatorFilter] = useState<string>("all");
+  const [personFilter, setPersonFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
-  const creatorOptions = Array.from(
+  const personOptions = Array.from(
     new Map(
-      events.filter((e) => e.created_by).map((e) => [e.created_by as string, e.creatorName || "Nezināms"])
+      [
+        ...events.filter((e) => e.created_by).map((e) => [e.created_by as string, e.creatorName || "Nezināms"] as const),
+        ...tasks.filter((t) => t.assigneeId).map((t) => [t.assigneeId as string, t.assigneeName || "Nezināms"] as const),
+      ]
     ).entries()
   );
 
   const visibleEvents =
-    creatorFilter === "all" ? events : events.filter((e) => e.created_by === creatorFilter);
+    typeFilter === "tasks"
+      ? []
+      : personFilter === "all"
+        ? events
+        : events.filter((e) => e.created_by === personFilter);
+
+  const visibleTasks =
+    typeFilter === "events"
+      ? []
+      : personFilter === "all"
+        ? tasks
+        : tasks.filter((t) => t.assigneeId === personFilter);
 
   const monthStart = startOfMonth(new Date(year, month - 1, 1));
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -79,6 +113,22 @@ export function CalendarMonthGrid({
     eventsByDay.get(key)!.push(e);
   }
 
+  const tasksByDay = new Map<string, CalendarGridTask[]>();
+  for (const t of visibleTasks) {
+    const key = t.due_date;
+    if (!tasksByDay.has(key)) tasksByDay.set(key, []);
+    tasksByDay.get(key)!.push(t);
+  }
+
+  function toggleTaskDone(task: CalendarGridTask, done: boolean) {
+    if (!updateTaskAction) return;
+    const formData = new FormData();
+    formData.set("taskId", task.id);
+    formData.set("status", done ? "done" : "todo");
+    for (const [k, v] of Object.entries(taskHiddenFields)) formData.set(k, v);
+    updateTaskAction(formData);
+  }
+
   function monthHref(y: number, m: number) {
     return `${basePath}?${paramNames.year}=${y}&${paramNames.month}=${m}`;
   }
@@ -87,6 +137,7 @@ export function CalendarMonthGrid({
   const today = new Date();
 
   const selectedDayEvents = selectedDay ? eventsByDay.get(selectedDay) ?? [] : [];
+  const selectedDayTasks = selectedDay ? tasksByDay.get(selectedDay) ?? [] : [];
 
   return (
     <div>
@@ -110,23 +161,32 @@ export function CalendarMonthGrid({
         </Link>
       </div>
 
-      {creatorOptions.length > 1 && (
-        <div className="mb-4 flex items-center gap-2">
-          <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <Select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+          className="h-9 w-auto"
+        >
+          <option value="all">Notikumi un uzdevumi</option>
+          <option value="events">Tikai notikumi</option>
+          <option value="tasks">Tikai uzdevumi</option>
+        </Select>
+        {personOptions.length > 1 && (
           <Select
-            value={creatorFilter}
-            onChange={(e) => setCreatorFilter(e.target.value)}
+            value={personFilter}
+            onChange={(e) => setPersonFilter(e.target.value)}
             className="h-9 w-auto"
           >
-            <option value="all">Visi ({events.length})</option>
-            {creatorOptions.map(([id, name]) => (
+            <option value="all">Visi cilvēki</option>
+            {personOptions.map(([id, name]) => (
               <option key={id} value={id}>
                 {name}
               </option>
             ))}
           </Select>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-border text-sm">
         {WEEKDAY_LABELS.map((d) => (
@@ -137,8 +197,10 @@ export function CalendarMonthGrid({
         {days.map((day) => {
           const key = format(day, "yyyy-MM-dd");
           const dayEvents = eventsByDay.get(key) ?? [];
+          const dayTasks = tasksByDay.get(key) ?? [];
           const inMonth = isSameMonth(day, monthStart);
           const isToday = isSameDay(day, today);
+          const totalItems = dayEvents.length + dayTasks.length;
 
           return (
             <button
@@ -158,8 +220,20 @@ export function CalendarMonthGrid({
                     {e.title}
                   </p>
                 ))}
-                {dayEvents.length > 3 && (
-                  <p className="text-[11px] text-muted-foreground">+{dayEvents.length - 3} vairāk</p>
+                {dayTasks.slice(0, 3).map((t) => (
+                  <p
+                    key={t.id}
+                    className={cn(
+                      "flex items-center gap-1 truncate rounded bg-muted px-1 text-[11px]",
+                      t.status === "done" && "line-through opacity-60"
+                    )}
+                  >
+                    <TaskColorDot color={t.color} className="h-1.5 w-1.5" />
+                    {t.title}
+                  </p>
+                ))}
+                {totalItems > 6 && (
+                  <p className="text-[11px] text-muted-foreground">+{totalItems - 6} vairāk</p>
                 )}
               </div>
             </button>
@@ -195,10 +269,37 @@ export function CalendarMonthGrid({
               </div>
             </li>
           ))}
-          {selectedDayEvents.length === 0 && (
+          {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 && (
             <p className="text-sm text-muted-foreground">Šai dienai vēl nav ierakstu.</p>
           )}
         </ul>
+
+        {selectedDayTasks.length > 0 && (
+          <ul className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Uzdevumi</p>
+            {selectedDayTasks.map((t) => (
+              <li key={t.id} className="flex items-center gap-2 rounded-md border border-border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={t.status === "done"}
+                  disabled={!updateTaskAction}
+                  onChange={(e) => toggleTaskDone(t, e.target.checked)}
+                  aria-label="Pabeigts"
+                  className="h-4 w-4"
+                />
+                <TaskColorDot color={t.color} />
+                <div className="flex-1">
+                  <p className={cn("font-medium", t.status === "done" && "text-muted-foreground line-through")}>
+                    {t.title}
+                  </p>
+                  {t.assigneeName && (
+                    <p className="text-xs text-muted-foreground">Atbildīgais: {t.assigneeName}</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {selectedDay && (
           <CalendarEventForm

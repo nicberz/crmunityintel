@@ -13,6 +13,9 @@
 .env.local
 .env*.local
 
+# db schema (kept out of the public repo — see db/migrations locally)
+/db/migrations/*.sql
+
 # misc
 .DS_Store
 *.pem

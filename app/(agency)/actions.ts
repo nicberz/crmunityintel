@@ -10,7 +10,15 @@ import { parseDatesInput } from "@/lib/dates";
 import { slugifyFieldKey, parseSelectOptions, collectLeadFieldValues } from "@/lib/lead-fields";
 import { sendNewLeadWhatsAppNotification } from "@/lib/whatsapp";
 import { fetchDueReminders, type DueReminder } from "@/lib/calendar-queries";
-import { LEAD_STATUSES, TASK_STATUSES, TASK_PRIORITIES, type LeadFieldDefinition } from "@/lib/types";
+import {
+  LEAD_STATUSES,
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  DEFAULT_TASK_COLOR,
+  type LeadFieldDefinition,
+} from "@/lib/types";
+
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Nederīga krāsa");
 
 const createClientSchema = z.object({
   name: z.string().trim().min(1, "Nosaukums ir obligāts"),
@@ -732,6 +740,8 @@ const createTaskSchema = z.object({
   description: z.string().trim().optional().or(z.literal("")),
   assignedTo: z.string().uuid().nullish().or(z.literal("")),
   priority: z.enum(TASK_PRIORITIES as [string, ...string[]]),
+  color: hexColorSchema.optional(),
+  groupId: z.string().uuid().nullish().or(z.literal("")),
   dueDate: z.string().trim().optional().or(z.literal("")),
 });
 
@@ -751,6 +761,8 @@ export async function createTaskAction(
     description: formData.get("description"),
     assignedTo: formData.get("assignedTo"),
     priority: formData.get("priority") || "medium",
+    color: formData.get("color") || undefined,
+    groupId: formData.get("groupId"),
     dueDate: formData.get("dueDate"),
   });
   if (!parseResult.success) {
@@ -766,19 +778,27 @@ export async function createTaskAction(
     title: parsed.title,
     description: parsed.description || null,
     priority: parsed.priority as (typeof TASK_PRIORITIES)[number],
+    color: parsed.color ?? DEFAULT_TASK_COLOR,
+    group_id: parsed.groupId || null,
     due_date: parsed.dueDate || null,
   });
   if (error) return { status: "error", message: error.message };
 
   revalidatePath(`/clients/${parsed.clientId}/tasks`);
+  revalidatePath(`/clients/${parsed.clientId}/calendar`);
   return { status: "success", message: `Uzdevums "${parsed.title}" pievienots.` };
 }
 
 const updateTaskSchema = z.object({
   taskId: z.string().uuid(),
   clientId: z.string().uuid(),
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
   status: z.enum(TASK_STATUSES as [string, ...string[]]).optional(),
   priority: z.enum(TASK_PRIORITIES as [string, ...string[]]).optional(),
+  color: hexColorSchema.optional(),
+  groupId: z.string().uuid().nullish().or(z.literal("")),
+  dueDate: z.string().trim().optional().or(z.literal("")),
   assignedTo: z.string().uuid().nullish().or(z.literal("")),
 });
 
@@ -787,17 +807,28 @@ export async function updateTaskAction(formData: FormData) {
   const parsed = updateTaskSchema.parse({
     taskId: formData.get("taskId"),
     clientId: formData.get("clientId"),
+    title: formData.has("title") ? formData.get("title") : undefined,
+    description: formData.has("description") ? formData.get("description") : undefined,
     status: formData.get("status") || undefined,
     priority: formData.get("priority") || undefined,
+    color: formData.get("color") || undefined,
+    groupId: formData.has("groupId") ? formData.get("groupId") : undefined,
+    dueDate: formData.has("dueDate") ? formData.get("dueDate") : undefined,
     assignedTo: formData.has("assignedTo") ? formData.get("assignedTo") : undefined,
   });
 
   const updates: Record<string, unknown> = {};
+  if (parsed.title) updates.title = parsed.title;
+  if (formData.has("description")) updates.description = parsed.description || null;
   if (parsed.status) {
     updates.status = parsed.status;
     updates.completed_at = parsed.status === "done" ? new Date().toISOString() : null;
+    updates.archived_at = parsed.status === "done" ? new Date().toISOString() : null;
   }
   if (parsed.priority) updates.priority = parsed.priority;
+  if (parsed.color) updates.color = parsed.color;
+  if (formData.has("groupId")) updates.group_id = parsed.groupId || null;
+  if (formData.has("dueDate")) updates.due_date = parsed.dueDate || null;
   if (formData.has("assignedTo")) updates.assigned_to = parsed.assignedTo || null;
 
   const supabase = createServerClient();
@@ -805,6 +836,7 @@ export async function updateTaskAction(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}/tasks`);
+  revalidatePath(`/clients/${parsed.clientId}/calendar`);
 }
 
 const deleteTaskSchema = z.object({ taskId: z.string().uuid(), clientId: z.string().uuid() });
@@ -818,6 +850,48 @@ export async function deleteTaskAction(formData: FormData) {
 
   const supabase = createServerClient();
   const { error } = await supabase.from("tasks").delete().eq("id", parsed.taskId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/clients/${parsed.clientId}/tasks`);
+  revalidatePath(`/clients/${parsed.clientId}/calendar`);
+}
+
+const createTaskGroupSchema = z.object({
+  clientId: z.string().uuid(),
+  name: z.string().trim().min(1, "Nosaukums ir obligāts"),
+  color: hexColorSchema.optional(),
+});
+
+export async function createTaskGroupAction(formData: FormData) {
+  await requireAgencyAdmin();
+  const parsed = createTaskGroupSchema.parse({
+    clientId: formData.get("clientId"),
+    name: formData.get("name"),
+    color: formData.get("color") || undefined,
+  });
+
+  const supabase = createServerClient();
+  const { error } = await supabase.from("task_groups").insert({
+    client_id: parsed.clientId,
+    name: parsed.name,
+    color: parsed.color ?? DEFAULT_TASK_COLOR,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/clients/${parsed.clientId}/tasks`);
+}
+
+const deleteTaskGroupSchema = z.object({ groupId: z.string().uuid(), clientId: z.string().uuid() });
+
+export async function deleteTaskGroupAction(formData: FormData) {
+  await requireAgencyAdmin();
+  const parsed = deleteTaskGroupSchema.parse({
+    groupId: formData.get("groupId"),
+    clientId: formData.get("clientId"),
+  });
+
+  const supabase = createServerClient();
+  const { error } = await supabase.from("task_groups").delete().eq("id", parsed.groupId);
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}/tasks`);
