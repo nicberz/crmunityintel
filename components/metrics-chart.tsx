@@ -27,18 +27,25 @@ export function MetricsChart({ data }: { data: ChartPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(214 32% 91%)" />
-        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-        <YAxis tick={{ fontSize: 12 }} width={40} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="date" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+        <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} width={40} />
         <Tooltip
           formatter={(value: number) =>
             new Intl.NumberFormat("lv-LV", { style: "currency", currency: "EUR" }).format(value)
           }
+          contentStyle={{
+            backgroundColor: "hsl(var(--card))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: 8,
+            color: "hsl(var(--foreground))",
+          }}
+          labelStyle={{ color: "hsl(var(--muted-foreground))" }}
         />
         <Line
           type="monotone"
           dataKey="costPerLead"
-          stroke="hsl(221 83% 53%)"
+          stroke="hsl(var(--primary))"
           strokeWidth={2}
           dot={false}
           connectNulls

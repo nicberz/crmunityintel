@@ -8,11 +8,11 @@ import {
 } from "@/lib/types";
 
 const statusClasses: Record<LeadStatus, string> = {
-  call_back: "bg-blue-100 text-blue-800",
-  no_answer: "bg-gray-100 text-gray-800",
-  reconsidering: "bg-amber-100 text-amber-800",
-  not_interested: "bg-red-100 text-red-800",
-  closed: "bg-emerald-100 text-emerald-800",
+  call_back: "bg-warning/15 text-warning",
+  no_answer: "bg-muted text-muted-foreground",
+  reconsidering: "bg-info/15 text-info",
+  not_interested: "bg-destructive/15 text-destructive",
+  closed: "bg-success/15 text-success",
 };
 
 export function Badge({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {

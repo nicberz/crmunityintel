@@ -16,7 +16,7 @@ export default async function AgencyLayout({ children }: { children: React.React
     <AppShell
       navItems={navItems}
       title="UnityIntelCRM · Aģentūra"
-      user={{ email: profile.email, roleLabel: "Aģentūras administrators" }}
+      user={{ email: profile.email, name: profile.full_name, roleLabel: "Aģentūras administrators" }}
       notificationBell={
         <NotificationBell
           getDueRemindersAction={getDueRemindersAction}

@@ -183,10 +183,10 @@ export const BUG_REPORT_SEVERITY_LABELS: Record<BugReportSeverity, string> = {
   critical: "Kritiska",
 };
 export const BUG_REPORT_SEVERITY_CLASSES: Record<BugReportSeverity, string> = {
-  low: "bg-gray-100 text-gray-800",
-  medium: "bg-amber-100 text-amber-800",
-  high: "bg-orange-100 text-orange-800",
-  critical: "bg-red-100 text-red-800",
+  low: "bg-muted text-muted-foreground",
+  medium: "bg-warning/15 text-warning",
+  high: "bg-accent-purple/15 text-accent-purple",
+  critical: "bg-destructive/15 text-destructive",
 };
 
 export const BUG_REPORT_STATUSES: BugReportStatus[] = ["open", "in_progress", "resolved", "closed"];

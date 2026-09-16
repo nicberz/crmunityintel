@@ -33,7 +33,7 @@ export function InviteClientForm({ clientId }: { clientId: string }) {
       </div>
       <SubmitButton />
       {state.status === "success" && (
-        <p className="text-sm text-emerald-600">{state.message}</p>
+        <p className="text-sm text-emerald-400">{state.message}</p>
       )}
       {state.status === "error" && (
         <p className="text-sm text-destructive">{state.message}</p>

@@ -43,7 +43,7 @@ export function WhatsAppSettingsForm({
       </div>
       <div className="flex items-center gap-3">
         <SubmitButton />
-        {state.status === "success" && <p className="text-sm text-emerald-600">{state.message}</p>}
+        {state.status === "success" && <p className="text-sm text-emerald-400">{state.message}</p>}
         {state.status === "error" && <p className="text-sm text-destructive">{state.message}</p>}
       </div>
     </form>

@@ -28,7 +28,7 @@ export default async function ClientAreaLayout({ children }: { children: React.R
       navItems={navItems}
       title="UnityIntelCRM"
       variant="sidebar"
-      user={{ email: profile.email, roleLabel: client?.name ?? "Klients" }}
+      user={{ email: profile.email, name: profile.full_name, roleLabel: client?.name ?? "Klients" }}
       notificationBell={
         <NotificationBell
           getDueRemindersAction={getDueRemindersAction}
