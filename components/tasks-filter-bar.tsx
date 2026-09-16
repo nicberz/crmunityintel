@@ -62,7 +62,7 @@ export function TasksFilterBar({
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Statuss</Label>
         <Select
-          className="h-9 w-40"
+          className="h-9 w-auto min-w-[10rem] max-w-full"
           defaultValue={filters.status ?? ""}
           onChange={(e) => navigate({ status: e.target.value })}
         >
@@ -77,7 +77,7 @@ export function TasksFilterBar({
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Prioritāte</Label>
         <Select
-          className="h-9 w-36"
+          className="h-9 w-auto min-w-[9rem] max-w-full"
           defaultValue={filters.priority ?? ""}
           onChange={(e) => navigate({ priority: e.target.value })}
         >
@@ -92,7 +92,7 @@ export function TasksFilterBar({
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Atbildīgais</Label>
         <Select
-          className="h-9 w-44"
+          className="h-9 w-auto min-w-[11rem] max-w-full"
           defaultValue={filters.assignedTo ?? ""}
           onChange={(e) => navigate({ assignedTo: e.target.value })}
         >
@@ -108,7 +108,7 @@ export function TasksFilterBar({
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Grupa</Label>
           <Select
-            className="h-9 w-40"
+            className="h-9 w-auto min-w-[10rem] max-w-full"
             defaultValue={filters.groupId ?? ""}
             onChange={(e) => navigate({ groupId: e.target.value })}
           >

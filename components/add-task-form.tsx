@@ -61,10 +61,10 @@ export function AddTaskForm({
         <Label htmlFor="task-description">Apraksts</Label>
         <Textarea id="task-description" name="description" placeholder="Neobligāti" rows={2} />
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="space-y-1.5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0 space-y-1.5">
           <Label htmlFor="task-assignedTo">Atbildīgais</Label>
-          <Select id="task-assignedTo" name="assignedTo" defaultValue="">
+          <Select id="task-assignedTo" name="assignedTo" defaultValue="" className="w-full">
             <option value="">Nav piešķirts</option>
             {teamMembers.map((m) => (
               <option key={m.id} value={m.id}>
@@ -73,19 +73,9 @@ export function AddTaskForm({
             ))}
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="task-priority">Prioritāte</Label>
-          <Select id="task-priority" name="priority" defaultValue="medium">
-            {TASK_PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {TASK_PRIORITY_LABELS[p]}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <Label htmlFor="task-groupId">Grupa</Label>
-          <Select id="task-groupId" name="groupId" defaultValue="">
+          <Select id="task-groupId" name="groupId" defaultValue="" className="w-full">
             <option value="">Nav grupas</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -94,9 +84,19 @@ export function AddTaskForm({
             ))}
           </Select>
         </div>
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
+          <Label htmlFor="task-priority">Prioritāte</Label>
+          <Select id="task-priority" name="priority" defaultValue="medium" className="w-full">
+            {TASK_PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {TASK_PRIORITY_LABELS[p]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="min-w-0 space-y-1.5">
           <Label htmlFor="task-dueDate">Termiņš</Label>
-          <Input id="task-dueDate" name="dueDate" type="date" />
+          <Input id="task-dueDate" name="dueDate" type="date" className="w-full" />
         </div>
       </div>
       <div className="space-y-1.5">

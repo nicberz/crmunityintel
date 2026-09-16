@@ -112,7 +112,7 @@ export function TasksTable({
                   <Select
                     name="assignedTo"
                     defaultValue={task.assigned_to ?? ""}
-                    className="h-8 w-40 text-xs"
+                    className="h-8 w-auto min-w-[9rem] max-w-full text-xs"
                     onChange={(e) => e.currentTarget.form?.requestSubmit()}
                   >
                     <option value="">Nav piešķirts</option>
@@ -133,7 +133,7 @@ export function TasksTable({
                   <Select
                     name="priority"
                     defaultValue={task.priority}
-                    className="h-8 w-28 text-xs"
+                    className="h-8 w-auto min-w-[7rem] max-w-full text-xs"
                     onChange={(e) => e.currentTarget.form?.requestSubmit()}
                   >
                     {TASK_PRIORITIES.map((p) => (
@@ -156,7 +156,7 @@ export function TasksTable({
                   <Select
                     name="status"
                     defaultValue={task.status}
-                    className="h-8 w-32 text-xs"
+                    className="h-8 w-auto min-w-[8rem] max-w-full text-xs"
                     onChange={(e) => e.currentTarget.form?.requestSubmit()}
                   >
                     {TASK_STATUSES.map((s) => (

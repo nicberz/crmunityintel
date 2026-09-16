@@ -66,10 +66,26 @@ export function TaskDetailsDialog({
             <Label htmlFor="edit-description">Apraksts</Label>
             <Textarea id="edit-description" name="description" rows={3} defaultValue={task.description ?? ""} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="edit-priority">Prioritāte</Label>
+                <Select id="edit-priority" name="priority" defaultValue={task.priority} className="w-full">
+                  {TASK_PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {TASK_PRIORITY_LABELS[p]}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="edit-dueDate">Termiņš</Label>
+                <Input id="edit-dueDate" name="dueDate" type="date" defaultValue={task.due_date ?? ""} className="w-full" />
+              </div>
+            </div>
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="edit-assignedTo">Atbildīgais</Label>
-              <Select id="edit-assignedTo" name="assignedTo" defaultValue={task.assigned_to ?? ""}>
+              <Select id="edit-assignedTo" name="assignedTo" defaultValue={task.assigned_to ?? ""} className="w-full">
                 <option value="">Nav piešķirts</option>
                 {teamMembers.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -78,19 +94,9 @@ export function TaskDetailsDialog({
                 ))}
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-priority">Prioritāte</Label>
-              <Select id="edit-priority" name="priority" defaultValue={task.priority}>
-                {TASK_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {TASK_PRIORITY_LABELS[p]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="edit-groupId">Grupa</Label>
-              <Select id="edit-groupId" name="groupId" defaultValue={task.group_id ?? ""}>
+              <Select id="edit-groupId" name="groupId" defaultValue={task.group_id ?? ""} className="w-full">
                 <option value="">Nav grupas</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
@@ -98,10 +104,6 @@ export function TaskDetailsDialog({
                   </option>
                 ))}
               </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-dueDate">Termiņš</Label>
-              <Input id="edit-dueDate" name="dueDate" type="date" defaultValue={task.due_date ?? ""} />
             </div>
           </div>
           <div className="space-y-1.5">
