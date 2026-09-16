@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -16,6 +16,7 @@ import {
   TASK_PRIORITY_LABELS,
   type Task,
   type TaskGroup,
+  type TaskStatus,
 } from "@/lib/types";
 
 export interface TaskWithNames extends Task {
@@ -39,13 +40,25 @@ export function TasksTable({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [selectedTask, setSelectedTask] = useState<TaskWithNames | null>(null);
+  const [optimisticStatus, setOptimisticStatus] = useState<Record<string, TaskStatus>>({});
+  const [, startTransition] = useTransition();
+
+  // Once fresh data comes back from the server (a new `tasks` array), the real
+  // status has caught up, so any optimistic override is no longer needed.
+  useEffect(() => {
+    setOptimisticStatus({});
+  }, [tasks]);
 
   function toggleDone(task: TaskWithNames, done: boolean) {
+    const nextStatus: TaskStatus = done ? "done" : "todo";
+    setOptimisticStatus((prev) => ({ ...prev, [task.id]: nextStatus }));
     const formData = new FormData();
     formData.set("taskId", task.id);
-    formData.set("status", done ? "done" : "todo");
+    formData.set("status", nextStatus);
     for (const [k, v] of Object.entries(hiddenFields)) formData.set(k, v);
-    updateAction(formData);
+    startTransition(() => {
+      updateAction(formData);
+    });
   }
 
   return (
@@ -65,14 +78,15 @@ export function TasksTable({
       </TableHeader>
       <TableBody>
         {tasks.map((task) => {
-          const overdue = Boolean(task.due_date) && task.due_date! < today && task.status !== "done";
+          const displayStatus = optimisticStatus[task.id] ?? task.status;
+          const overdue = Boolean(task.due_date) && task.due_date! < today && displayStatus !== "done";
           const group = task.group_id ? groups.find((g) => g.id === task.group_id) ?? null : null;
           return (
             <TableRow key={task.id}>
               <TableCell>
                 <input
                   type="checkbox"
-                  checked={task.status === "done"}
+                  checked={displayStatus === "done"}
                   onChange={(e) => toggleDone(task, e.target.checked)}
                   aria-label="Pabeigts"
                   className="h-4 w-4"
@@ -89,7 +103,7 @@ export function TasksTable({
                     <p
                       className={cn(
                         "font-medium hover:underline",
-                        task.status === "done" && "text-muted-foreground line-through"
+                        displayStatus === "done" && "text-muted-foreground line-through"
                       )}
                     >
                       {task.title}
@@ -154,8 +168,9 @@ export function TasksTable({
                     <input key={k} type="hidden" name={k} value={v} />
                   ))}
                   <Select
+                    key={displayStatus}
                     name="status"
-                    defaultValue={task.status}
+                    defaultValue={displayStatus}
                     className="h-8 w-auto min-w-[8rem] max-w-full text-xs"
                     onChange={(e) => e.currentTarget.form?.requestSubmit()}
                   >

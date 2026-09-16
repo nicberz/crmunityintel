@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   eachDayOfInterval,
@@ -77,6 +77,16 @@ export function CalendarMonthGrid({
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [optimisticStatus, setOptimisticStatus] = useState<Record<string, TaskStatus>>({});
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    setOptimisticStatus({});
+  }, [tasks]);
+
+  const tasksWithOptimisticStatus = tasks.map((t) =>
+    optimisticStatus[t.id] ? { ...t, status: optimisticStatus[t.id] } : t
+  );
 
   const personOptions = Array.from(
     new Map(
@@ -98,8 +108,8 @@ export function CalendarMonthGrid({
     typeFilter === "events"
       ? []
       : personFilter === "all"
-        ? tasks
-        : tasks.filter((t) => t.assigneeId === personFilter);
+        ? tasksWithOptimisticStatus
+        : tasksWithOptimisticStatus.filter((t) => t.assigneeId === personFilter);
 
   const monthStart = startOfMonth(new Date(year, month - 1, 1));
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -122,11 +132,15 @@ export function CalendarMonthGrid({
 
   function toggleTaskDone(task: CalendarGridTask, done: boolean) {
     if (!updateTaskAction) return;
+    const nextStatus: TaskStatus = done ? "done" : "todo";
+    setOptimisticStatus((prev) => ({ ...prev, [task.id]: nextStatus }));
     const formData = new FormData();
     formData.set("taskId", task.id);
-    formData.set("status", done ? "done" : "todo");
+    formData.set("status", nextStatus);
     for (const [k, v] of Object.entries(taskHiddenFields)) formData.set(k, v);
-    updateTaskAction(formData);
+    startTransition(() => {
+      updateTaskAction(formData);
+    });
   }
 
   function monthHref(y: number, m: number) {
