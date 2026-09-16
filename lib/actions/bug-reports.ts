@@ -70,3 +70,16 @@ export async function updateBugReportStatusAction(formData: FormData) {
 
   revalidatePath("/bug-reports");
 }
+
+const deleteBugReportSchema = z.object({ reportId: z.string().uuid() });
+
+export async function deleteBugReportAction(formData: FormData) {
+  await requireAgencyAdmin();
+  const parsed = deleteBugReportSchema.parse({ reportId: formData.get("reportId") });
+
+  const supabase = createServerClient();
+  const { error } = await supabase.from("bug_reports").delete().eq("id", parsed.reportId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/bug-reports");
+}

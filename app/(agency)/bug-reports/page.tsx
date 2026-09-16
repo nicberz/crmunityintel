@@ -1,16 +1,13 @@
+import { Trash2 } from "lucide-react";
 import { requireAgencyAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { updateBugReportStatusAction } from "@/lib/actions/bug-reports";
-import { Select } from "@/components/ui/select";
+import { updateBugReportStatusAction, deleteBugReportAction } from "@/lib/actions/bug-reports";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BugSeverityBadge } from "@/components/ui/badge";
+import { BugReportStatusSelect } from "@/components/bug-report-status-select";
 import { formatDate } from "@/lib/dates";
-import {
-  BUG_REPORT_STATUSES,
-  BUG_REPORT_STATUS_LABELS,
-  BUG_REPORT_SEVERITY_LABELS,
-  type BugReport,
-} from "@/lib/types";
+import { BUG_REPORT_SEVERITY_LABELS, type BugReport } from "@/lib/types";
 
 export default async function BugReportsPage() {
   await requireAgencyAdmin();
@@ -40,6 +37,7 @@ export default async function BugReportsPage() {
             <TableHead>Lapa</TableHead>
             <TableHead>Datums</TableHead>
             <TableHead>Statuss</TableHead>
+            <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -58,27 +56,25 @@ export default async function BugReportsPage() {
               <TableCell className="text-xs text-muted-foreground">{report.page_path || "—"}</TableCell>
               <TableCell className="text-sm">{formatDate(report.created_at)}</TableCell>
               <TableCell>
-                <form action={updateBugReportStatusAction}>
+                <BugReportStatusSelect
+                  reportId={report.id}
+                  status={report.status}
+                  updateAction={updateBugReportStatusAction}
+                />
+              </TableCell>
+              <TableCell>
+                <form action={deleteBugReportAction}>
                   <input type="hidden" name="reportId" value={report.id} />
-                  <Select
-                    name="status"
-                    defaultValue={report.status}
-                    className="h-8 w-32 text-xs"
-                    onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                  >
-                    {BUG_REPORT_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {BUG_REPORT_STATUS_LABELS[s]}
-                      </option>
-                    ))}
-                  </Select>
+                  <Button type="submit" variant="ghost" size="sm">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </form>
               </TableCell>
             </TableRow>
           ))}
           {reports.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 Vēl nav neviena ziņojuma.
               </TableCell>
             </TableRow>
