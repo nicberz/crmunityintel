@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/server";
 import { hashApiKey } from "@/lib/api-key";
-import { validateFieldValue } from "@/lib/lead-fields";
+import { validateFieldValue, getDefaultFieldDef, resolveAndCheckDefaultField } from "@/lib/lead-fields";
 import { sendNewLeadWhatsAppNotification } from "@/lib/whatsapp";
 import type { LeadFieldDefinition } from "@/lib/types";
 
@@ -17,8 +17,8 @@ export function OPTIONS() {
 }
 
 const leadSubmissionSchema = z.object({
-  phone: z.string().trim().min(1, "phone is required"),
-  email: z.string().trim().email("email must be valid"),
+  phone: z.string().trim().optional().or(z.literal("")),
+  email: z.string().trim().email("email must be valid").optional().or(z.literal("")),
   group: z.string().trim().optional(),
   dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dates must be YYYY-MM-DD")).optional(),
   fields: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
@@ -56,11 +56,33 @@ export async function POST(request: NextRequest) {
     .select("*")
     .eq("client_id", client.id);
   const definitions = (fieldDefs ?? []) as LeadFieldDefinition[];
+  const customDefinitions = definitions.filter((d) => !d.is_default);
+
+  const phoneDef = getDefaultFieldDef(definitions, "phone");
+  const emailDef = getDefaultFieldDef(definitions, "email");
+  const groupDef = getDefaultFieldDef(definitions, "group_name");
+  const datesDef = getDefaultFieldDef(definitions, "preferred_dates");
+
+  let phone: string;
+  let email: string;
+  let group: string;
+  let dates: string[];
+  try {
+    phone = resolveAndCheckDefaultField(phoneDef, parsed.data.phone ?? "", "", (v) => !v);
+    email = resolveAndCheckDefaultField(emailDef, parsed.data.email ?? "", "", (v) => !v);
+    group = resolveAndCheckDefaultField(groupDef, parsed.data.group ?? "", "", (v) => !v);
+    dates = resolveAndCheckDefaultField(datesDef, parsed.data.dates ?? [], [] as string[], (v) => v.length === 0);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Missing required field" },
+      { status: 400, headers: corsHeaders }
+    );
+  }
 
   const submittedFields = parsed.data.fields ?? {};
   const fieldValues: { field_definition_id: string; value: string }[] = [];
 
-  for (const def of definitions) {
+  for (const def of customDefinitions) {
     const rawValue = submittedFields[def.key];
     if (rawValue === undefined || rawValue === null || rawValue === "") {
       if (def.is_required) {
@@ -87,10 +109,10 @@ export async function POST(request: NextRequest) {
     .insert({
       client_id: client.id,
       name: null,
-      email: parsed.data.email,
-      phone: parsed.data.phone,
-      group_name: parsed.data.group ?? null,
-      preferred_dates: parsed.data.dates ?? null,
+      email: email || null,
+      phone: phone || null,
+      group_name: group || null,
+      preferred_dates: dates.length ? dates : null,
       source: "website_form",
       status: "call_back",
     })
@@ -118,7 +140,7 @@ export async function POST(request: NextRequest) {
     await sendNewLeadWhatsAppNotification({
       to: client.whatsapp_phone,
       leadName: null,
-      leadContact: parsed.data.phone || parsed.data.email,
+      leadContact: phone || email || null,
     });
   }
 

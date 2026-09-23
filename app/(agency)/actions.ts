@@ -7,9 +7,17 @@ import { requireAgencyAdmin } from "@/lib/auth";
 import { generateApiKey } from "@/lib/api-key";
 import { getSiteUrl } from "@/lib/site-url";
 import { parseDatesInput } from "@/lib/dates";
-import { slugifyFieldKey, parseSelectOptions, collectLeadFieldValues } from "@/lib/lead-fields";
+import {
+  slugifyFieldKey,
+  parseSelectOptions,
+  collectLeadFieldValues,
+  validateDefaultFields,
+  assertLabelAvailable,
+  DEFAULT_FIELD_SEED,
+} from "@/lib/lead-fields";
 import { sendNewLeadWhatsAppNotification } from "@/lib/whatsapp";
 import { fetchDueReminders, type DueReminder } from "@/lib/calendar-queries";
+import { parseTagsInput } from "@/lib/utils";
 import {
   LEAD_STATUSES,
   TASK_STATUSES,
@@ -33,8 +41,22 @@ export async function createClientAction(formData: FormData) {
   });
 
   const supabase = createServerClient();
-  const { error } = await supabase.from("clients").insert(parsed);
+  const { data: client, error } = await supabase.from("clients").insert(parsed).select("id").single();
   if (error) throw new Error(error.message);
+
+  const { error: fieldsError } = await supabase.from("lead_field_definitions").insert(
+    DEFAULT_FIELD_SEED.map((f) => ({
+      client_id: client!.id,
+      key: f.key,
+      label: f.label,
+      field_type: "text" as const,
+      is_required: f.is_required,
+      is_default: true,
+      is_enabled: true,
+      sort_order: f.sort_order,
+    }))
+  );
+  if (fieldsError) throw new Error(fieldsError.message);
 
   revalidatePath("/clients");
   revalidatePath("/dashboard");
@@ -234,12 +256,7 @@ export async function generateClientApiKeyAction(
 
 const addLeadSchema = z.object({
   clientId: z.string().uuid(),
-  name: z.string().trim().min(1, "Vārds ir obligāts"),
-  email: z.string().trim().email().optional().or(z.literal("")),
-  phone: z.string().trim().optional().or(z.literal("")),
   notes: z.string().trim().optional().or(z.literal("")),
-  group_name: z.string().trim().optional().or(z.literal("")),
-  dates: z.string().trim().optional().or(z.literal("")),
   status: z.enum(LEAD_STATUSES as [string, ...string[]]),
 });
 
@@ -252,12 +269,7 @@ export async function addLeadAction(_prevState: AddLeadState, formData: FormData
   await requireAgencyAdmin();
   const parseResult = addLeadSchema.safeParse({
     clientId: formData.get("clientId"),
-    name: formData.get("name"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
     notes: formData.get("notes"),
-    group_name: formData.get("group_name"),
-    dates: formData.get("dates"),
     status: formData.get("status"),
   });
   if (!parseResult.success) {
@@ -265,31 +277,35 @@ export async function addLeadAction(_prevState: AddLeadState, formData: FormData
   }
   const parsed = parseResult.data;
 
-  const preferredDates = parsed.dates ? parseDatesInput(parsed.dates) : [];
-
   const supabase = createServerClient();
 
-  const { data: fieldDefs } = await supabase
+  const { data: allFieldDefs } = await supabase
     .from("lead_field_definitions")
     .select("*")
     .eq("client_id", parsed.clientId);
+  const fieldDefs = (allFieldDefs ?? []) as LeadFieldDefinition[];
+  const customFieldDefs = fieldDefs.filter((d) => !d.is_default);
 
+  let defaultFields;
   let fieldValues;
   try {
-    fieldValues = collectLeadFieldValues((fieldDefs ?? []) as LeadFieldDefinition[], formData);
+    defaultFields = validateDefaultFields(fieldDefs, formData);
+    fieldValues = collectLeadFieldValues(customFieldDefs, formData);
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : "Nederīgi dati." };
   }
+
+  const preferredDates = defaultFields.datesInput ? parseDatesInput(defaultFields.datesInput) : [];
 
   const { data: lead, error } = await supabase
     .from("leads")
     .insert({
       client_id: parsed.clientId,
-      name: parsed.name,
-      email: parsed.email || null,
-      phone: parsed.phone || null,
+      name: defaultFields.name,
+      email: defaultFields.email,
+      phone: defaultFields.phone,
       notes: parsed.notes || null,
-      group_name: parsed.group_name || null,
+      group_name: defaultFields.group_name,
       preferred_dates: preferredDates.length ? preferredDates : null,
       source: "manual",
       status: parsed.status as (typeof LEAD_STATUSES)[number],
@@ -314,48 +330,52 @@ export async function addLeadAction(_prevState: AddLeadState, formData: FormData
   if (clientRow?.whatsapp_phone) {
     await sendNewLeadWhatsAppNotification({
       to: clientRow.whatsapp_phone,
-      leadName: parsed.name,
-      leadContact: parsed.phone || parsed.email || null,
+      leadName: defaultFields.name,
+      leadContact: defaultFields.phone || defaultFields.email || null,
     });
   }
 
   revalidatePath(`/clients/${parsed.clientId}`);
-  return { status: "success", message: `Leads "${parsed.name}" pievienots.` };
+  return { status: "success", message: `Leads "${defaultFields.name ?? ""}" pievienots.` };
 }
 
 const updateLeadSchema = z.object({
   leadId: z.string().uuid(),
-  name: z.string().trim().min(1, "Vārds ir obligāts"),
-  email: z.string().trim().email().optional().or(z.literal("")),
-  phone: z.string().trim().optional().or(z.literal("")),
-  notes: z.string().trim().optional().or(z.literal("")),
-  group_name: z.string().trim().optional().or(z.literal("")),
-  dates: z.string().trim().optional().or(z.literal("")),
 });
 
 export async function updateLeadAction(formData: FormData) {
   await requireAgencyAdmin();
   const parsed = updateLeadSchema.parse({
     leadId: formData.get("leadId"),
-    name: formData.get("name"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
-    notes: formData.get("notes"),
-    group_name: formData.get("group_name"),
-    dates: formData.get("dates"),
   });
 
-  const preferredDates = parsed.dates ? parseDatesInput(parsed.dates) : [];
-
   const supabase = createServerClient();
+
+  const { data: existingLead } = await supabase
+    .from("leads")
+    .select("client_id")
+    .eq("id", parsed.leadId)
+    .single();
+  if (!existingLead) throw new Error("Leads nav atrasts.");
+
+  const { data: allFieldDefs } = await supabase
+    .from("lead_field_definitions")
+    .select("*")
+    .eq("client_id", existingLead.client_id);
+  const fieldDefs = (allFieldDefs ?? []) as LeadFieldDefinition[];
+  const customFieldDefs = fieldDefs.filter((d) => !d.is_default);
+
+  const defaultFields = validateDefaultFields(fieldDefs, formData);
+  const preferredDates = defaultFields.datesInput ? parseDatesInput(defaultFields.datesInput) : [];
+
   const { data: lead, error } = await supabase
     .from("leads")
     .update({
-      name: parsed.name,
-      email: parsed.email || null,
-      phone: parsed.phone || null,
-      notes: parsed.notes || null,
-      group_name: parsed.group_name || null,
+      name: defaultFields.name,
+      email: defaultFields.email,
+      phone: defaultFields.phone,
+      notes: (formData.get("notes") as string | null)?.trim() || null,
+      group_name: defaultFields.group_name,
       preferred_dates: preferredDates.length ? preferredDates : null,
     })
     .eq("id", parsed.leadId)
@@ -364,11 +384,7 @@ export async function updateLeadAction(formData: FormData) {
   if (error) throw new Error(error.message);
   if (!lead) throw new Error("Leads nav atrasts.");
 
-  const { data: fieldDefs } = await supabase
-    .from("lead_field_definitions")
-    .select("*")
-    .eq("client_id", lead.client_id);
-  const fieldValues = collectLeadFieldValues((fieldDefs ?? []) as LeadFieldDefinition[], formData, {
+  const fieldValues = collectLeadFieldValues(customFieldDefs, formData, {
     includeEmpty: true,
   });
 
@@ -449,8 +465,10 @@ export async function addLeadFieldAction(formData: FormData) {
   const supabase = createServerClient();
   const { data: existing } = await supabase
     .from("lead_field_definitions")
-    .select("key")
+    .select("id, key, label")
     .eq("client_id", parsed.clientId);
+
+  assertLabelAvailable(existing ?? [], parsed.label);
 
   const existingKeys = new Set((existing ?? []).map((d) => d.key));
   const baseKey = slugifyFieldKey(parsed.label);
@@ -503,6 +521,13 @@ export async function updateLeadFieldAction(formData: FormData) {
   }
 
   const supabase = createServerClient();
+  const { data: existing } = await supabase
+    .from("lead_field_definitions")
+    .select("id, label")
+    .eq("client_id", parsed.clientId);
+
+  assertLabelAvailable(existing ?? [], parsed.label, parsed.fieldId);
+
   const { error } = await supabase
     .from("lead_field_definitions")
     .update({
@@ -511,7 +536,8 @@ export async function updateLeadFieldAction(formData: FormData) {
       options,
       is_required: parsed.isRequired === "on",
     })
-    .eq("id", parsed.fieldId);
+    .eq("id", parsed.fieldId)
+    .eq("client_id", parsed.clientId);
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}`);
@@ -532,7 +558,55 @@ export async function deleteLeadFieldAction(formData: FormData) {
   });
 
   const supabase = createServerClient();
-  const { error } = await supabase.from("lead_field_definitions").delete().eq("id", parsed.fieldId);
+  const { error } = await supabase
+    .from("lead_field_definitions")
+    .delete()
+    .eq("id", parsed.fieldId)
+    .eq("client_id", parsed.clientId)
+    .eq("is_default", false);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
+  revalidatePath("/clients/[id]/leads/[leadId]", "page");
+}
+
+const updateDefaultLeadFieldSchema = z.object({
+  fieldId: z.string().uuid(),
+  clientId: z.string().uuid(),
+  label: z.string().trim().min(1, "Nosaukums ir obligāts"),
+  isRequired: z.string().nullish(),
+  isEnabled: z.string().nullish(),
+});
+
+export async function updateDefaultLeadFieldAction(formData: FormData) {
+  await requireAgencyAdmin();
+  const parsed = updateDefaultLeadFieldSchema.parse({
+    fieldId: formData.get("fieldId"),
+    clientId: formData.get("clientId"),
+    label: formData.get("label"),
+    isRequired: formData.get("isRequired"),
+    isEnabled: formData.get("isEnabled"),
+  });
+
+  const supabase = createServerClient();
+  const { data: existing } = await supabase
+    .from("lead_field_definitions")
+    .select("id, label")
+    .eq("client_id", parsed.clientId);
+
+  assertLabelAvailable(existing ?? [], parsed.label, parsed.fieldId);
+
+  const { error } = await supabase
+    .from("lead_field_definitions")
+    .update({
+      label: parsed.label,
+      is_required: parsed.isRequired === "on",
+      is_enabled: parsed.isEnabled === "on",
+    })
+    .eq("id", parsed.fieldId)
+    .eq("client_id", parsed.clientId)
+    .eq("is_default", true);
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}`);
@@ -742,6 +816,7 @@ const createTaskSchema = z.object({
   priority: z.enum(TASK_PRIORITIES as [string, ...string[]]),
   color: hexColorSchema.optional(),
   groupId: z.string().uuid().nullish().or(z.literal("")),
+  tags: z.string().optional(),
   dueDate: z.string().trim().optional().or(z.literal("")),
 });
 
@@ -763,6 +838,7 @@ export async function createTaskAction(
     priority: formData.get("priority") || "medium",
     color: formData.get("color") || undefined,
     groupId: formData.get("groupId"),
+    tags: formData.get("tags") || undefined,
     dueDate: formData.get("dueDate"),
   });
   if (!parseResult.success) {
@@ -780,6 +856,7 @@ export async function createTaskAction(
     priority: parsed.priority as (typeof TASK_PRIORITIES)[number],
     color: parsed.color ?? DEFAULT_TASK_COLOR,
     group_id: parsed.groupId || null,
+    tags: parsed.tags ? parseTagsInput(parsed.tags) : [],
     due_date: parsed.dueDate || null,
   });
   if (error) return { status: "error", message: error.message };
@@ -798,6 +875,7 @@ const updateTaskSchema = z.object({
   priority: z.enum(TASK_PRIORITIES as [string, ...string[]]).optional(),
   color: hexColorSchema.optional(),
   groupId: z.string().uuid().nullish().or(z.literal("")),
+  tags: z.string().optional(),
   dueDate: z.string().trim().optional().or(z.literal("")),
   assignedTo: z.string().uuid().nullish().or(z.literal("")),
 });
@@ -813,6 +891,7 @@ export async function updateTaskAction(formData: FormData) {
     priority: formData.get("priority") || undefined,
     color: formData.get("color") || undefined,
     groupId: formData.has("groupId") ? formData.get("groupId") : undefined,
+    tags: formData.has("tags") ? formData.get("tags") : undefined,
     dueDate: formData.has("dueDate") ? formData.get("dueDate") : undefined,
     assignedTo: formData.has("assignedTo") ? formData.get("assignedTo") : undefined,
   });
@@ -828,6 +907,7 @@ export async function updateTaskAction(formData: FormData) {
   if (parsed.priority) updates.priority = parsed.priority;
   if (parsed.color) updates.color = parsed.color;
   if (formData.has("groupId")) updates.group_id = parsed.groupId || null;
+  if (formData.has("tags")) updates.tags = parseTagsInput(parsed.tags ?? "");
   if (formData.has("dueDate")) updates.due_date = parsed.dueDate || null;
   if (formData.has("assignedTo")) updates.assigned_to = parsed.assignedTo || null;
 

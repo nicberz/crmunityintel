@@ -16,5 +16,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL("/login?error=invite_link_invalid", request.url));
+  return NextResponse.redirect(new URL("/login?error=auth_link_invalid", request.url));
 }

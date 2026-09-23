@@ -6,6 +6,7 @@ import {
   addLeadFieldAction,
   updateLeadFieldAction,
   deleteLeadFieldAction,
+  updateDefaultLeadFieldAction,
 } from "@/app/(agency)/actions";
 import { summarizeMetrics, commissionConfigFromClient, formatEur } from "@/lib/commission";
 import { formatDate } from "@/lib/dates";
@@ -20,6 +21,7 @@ import { ApiKeyCard } from "@/components/api-key-card";
 import { WhatsAppSettingsForm } from "@/components/whatsapp-settings-form";
 import { CommissionSettingsForm } from "@/components/commission-settings-form";
 import { LeadFieldEditor } from "@/components/lead-field-editor";
+import { DefaultLeadFieldEditor } from "@/components/default-lead-field-editor";
 import type { AdMetricsDaily, Client, LeadFieldDefinition } from "@/lib/types";
 
 export default async function ClientSettingsTabPage({ params }: { params: { id: string } }) {
@@ -44,6 +46,8 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
   const typedClient = client as Client;
   const metricsList = (metrics ?? []) as AdMetricsDaily[];
   const fieldDefs = (fieldDefsData ?? []) as LeadFieldDefinition[];
+  const defaultFields = fieldDefs.filter((f) => f.is_default);
+  const customFields = fieldDefs.filter((f) => !f.is_default);
   const summary = summarizeMetrics(metricsList, commissionConfigFromClient(typedClient));
 
   return (
@@ -160,7 +164,12 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
             </CardContent>
           </Card>
 
-          <ApiKeyCard clientId={typedClient.id} apiKeyPrefix={typedClient.api_key_prefix} />
+          <ApiKeyCard
+            clientId={typedClient.id}
+            apiKeyPrefix={typedClient.api_key_prefix}
+            defaultFields={defaultFields}
+            customFields={customFields}
+          />
         </div>
 
         <Card>
@@ -173,18 +182,37 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
         </Card>
       </CollapsibleSection>
 
-      <CollapsibleSection icon={SlidersHorizontal} title="Pielāgotie lauki">
+      <CollapsibleSection icon={SlidersHorizontal} title="Leadu lauki">
         <p className="text-sm text-muted-foreground">
-          Papildu lauki, ko šis klients var aizpildīt caur API vai manuālo pievienošanu (bez telefona un
-          e-pasta, kas vienmēr ir pieejami).
+          Pārvaldi, kādi lauki tiek rādīti un pieprasīti šī klienta leadu anketā — gan sistēmas noklusējuma
+          laukus, gan pielāgotos laukus. Šie paši lauki nosaka, ko var nosūtīt caur API (skaties zemāk).
         </p>
-        <LeadFieldEditor
-          fields={fieldDefs}
-          hiddenFields={{ clientId: typedClient.id }}
-          addAction={addLeadFieldAction}
-          updateAction={updateLeadFieldAction}
-          deleteAction={deleteLeadFieldAction}
-        />
+        <Card>
+          <CardHeader>
+            <CardTitle>Noklusējuma lauki</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DefaultLeadFieldEditor
+              fields={defaultFields}
+              hiddenFields={{ clientId: typedClient.id }}
+              updateAction={updateDefaultLeadFieldAction}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pielāgotie lauki</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <LeadFieldEditor
+              fields={customFields}
+              hiddenFields={{ clientId: typedClient.id }}
+              addAction={addLeadFieldAction}
+              updateAction={updateLeadFieldAction}
+              deleteAction={deleteLeadFieldAction}
+            />
+          </CardContent>
+        </Card>
       </CollapsibleSection>
     </div>
   );

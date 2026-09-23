@@ -88,6 +88,8 @@ export interface LeadFieldDefinition {
   field_type: LeadFieldType;
   options: string[] | null;
   is_required: boolean;
+  is_default: boolean;
+  is_enabled: boolean;
   sort_order: number;
   created_at: string;
 }
@@ -157,6 +159,7 @@ export interface Task {
   priority: TaskPriority;
   color: TaskColor;
   group_id: string | null;
+  tags: string[];
   due_date: string | null;
   completed_at: string | null;
   archived_at: string | null;

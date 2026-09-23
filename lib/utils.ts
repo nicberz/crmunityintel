@@ -5,6 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function taskMatchesQuery(
+  task: { title: string; description: string | null; tags: string[] },
+  query: string
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (task.title.toLowerCase().includes(q)) return true;
+  if (task.description && task.description.toLowerCase().includes(q)) return true;
+  return task.tags.some((tag) => tag.toLowerCase().includes(q));
+}
+
+export function parseTagsInput(value: string): string[] {
+  const seen = new Set<string>();
+  for (const raw of value.split(",")) {
+    const tag = raw.trim();
+    if (tag) seen.add(tag);
+  }
+  return Array.from(seen);
+}
+
 // Picks readable black/white text for an arbitrary hex background color.
 export function getContrastTextColor(hex: string): "#000000" | "#ffffff" {
   const clean = hex.replace("#", "");

@@ -119,10 +119,16 @@ export function AppShell({
               );
             })}
           </nav>
-          <div className="border-t border-border p-4">
+          <div className="space-y-2 border-t border-border p-4">
             <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
               Iziet
             </Button>
+            <Link
+              href="/privacy"
+              className="block text-center text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              Privātuma politika
+            </Link>
           </div>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
@@ -141,7 +147,7 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-8">
@@ -170,7 +176,12 @@ export function AppShell({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
+      <footer className="px-6 pb-8 text-center">
+        <Link href="/privacy" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+          Privātuma politika
+        </Link>
+      </footer>
       <ReportBugButton />
     </div>
   );

@@ -100,6 +100,10 @@ export function AddTaskForm({
         </div>
       </div>
       <div className="space-y-1.5">
+        <Label htmlFor="task-tags">Tagi</Label>
+        <Input id="task-tags" name="tags" placeholder="piem., mārketings, steidzami" />
+      </div>
+      <div className="space-y-1.5">
         <Label>Krāsa</Label>
         <ColorSwatchPicker name="color" value={color} onChange={setColor} />
       </div>

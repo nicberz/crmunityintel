@@ -62,6 +62,7 @@ export function LeadFieldEditor({
             >
               <div>
                 <span className="font-medium">{field.label}</span>{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">{field.key}</code>{" "}
                 <span className="text-muted-foreground">
                   ({FIELD_TYPE_LABELS[field.field_type]}
                   {field.field_type === "select" && field.options?.length

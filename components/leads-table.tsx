@@ -9,6 +9,7 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/compon
 import { LeadStatusBadge } from "@/components/ui/badge";
 import { LeadStatusSelect } from "@/components/lead-status-select";
 import { formatDate } from "@/lib/dates";
+import { getDefaultFieldDef } from "@/lib/lead-fields";
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, type Lead, type LeadFieldDefinition } from "@/lib/types";
 
 interface LeadsTableProps {
@@ -47,7 +48,31 @@ export function LeadsTable({
   const [isPending, startTransition] = useTransition();
 
   const allSelected = leads.length > 0 && selected.size === leads.length;
-  const colSpan = 7 + fieldDefs.length + (showSourceColumn ? 1 : 0);
+  const customFieldDefs = fieldDefs.filter((f) => !f.is_default);
+
+  const nameField = getDefaultFieldDef(fieldDefs, "name");
+  const emailField = getDefaultFieldDef(fieldDefs, "email");
+  const phoneField = getDefaultFieldDef(fieldDefs, "phone");
+  const groupField = getDefaultFieldDef(fieldDefs, "group_name");
+  const datesField = getDefaultFieldDef(fieldDefs, "preferred_dates");
+  const nameEnabled = nameField?.is_enabled ?? true;
+  const emailEnabled = emailField?.is_enabled ?? true;
+  const phoneEnabled = phoneField?.is_enabled ?? true;
+  const groupEnabled = groupField?.is_enabled ?? true;
+  const datesEnabled = datesField?.is_enabled ?? true;
+  const contactsEnabled = emailEnabled || phoneEnabled;
+  const contactsLabel = [emailEnabled && emailField?.label, phoneEnabled && phoneField?.label]
+    .filter(Boolean)
+    .join(" / ") || "Kontakti";
+
+  const fixedColumnCount =
+    1 + // checkbox
+    (nameEnabled ? 1 : 0) +
+    (contactsEnabled ? 1 : 0) +
+    (groupEnabled ? 1 : 0) +
+    (datesEnabled ? 1 : 0) +
+    2; // statuss, pievienots
+  const colSpan = fixedColumnCount + customFieldDefs.length + (showSourceColumn ? 1 : 0);
 
   function toggleAll() {
     setSelected(allSelected ? new Set() : new Set(leads.map((l) => l.id)));
@@ -132,11 +157,11 @@ export function LeadsTable({
                 aria-label="Izvēlēties visus"
               />
             </TableHead>
-            <TableHead>Vārds</TableHead>
-            <TableHead>Kontakti</TableHead>
-            <TableHead>Grupa</TableHead>
-            <TableHead>Datumi</TableHead>
-            {fieldDefs.map((f) => (
+            {nameEnabled && <TableHead>{nameField?.label ?? "Vārds"}</TableHead>}
+            {contactsEnabled && <TableHead>{contactsLabel}</TableHead>}
+            {groupEnabled && <TableHead>{groupField?.label ?? "Grupa"}</TableHead>}
+            {datesEnabled && <TableHead>{datesField?.label ?? "Datumi"}</TableHead>}
+            {customFieldDefs.map((f) => (
               <TableHead key={f.id}>{f.label}</TableHead>
             ))}
             {showSourceColumn && <TableHead>Avots</TableHead>}
@@ -164,19 +189,27 @@ export function LeadsTable({
                   aria-label={`Izvēlēties ${lead.name ?? "leadu"}`}
                 />
               </TableCell>
-              <TableCell className="font-medium">
-                <Link href={`${detailHrefBase}/${lead.id}`} className="hover:underline">
-                  {lead.name || "—"}
-                </Link>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {[lead.email, lead.phone].filter(Boolean).join(" · ") || "—"}
-              </TableCell>
-              <TableCell className="text-muted-foreground">{lead.group_name || "—"}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {lead.preferred_dates?.length ? lead.preferred_dates.map((d) => formatDate(d)).join(", ") : "—"}
-              </TableCell>
-              {fieldDefs.map((f) => (
+              {nameEnabled && (
+                <TableCell className="font-medium">
+                  <Link href={`${detailHrefBase}/${lead.id}`} className="hover:underline">
+                    {lead.name || "—"}
+                  </Link>
+                </TableCell>
+              )}
+              {contactsEnabled && (
+                <TableCell className="text-muted-foreground">
+                  {[emailEnabled && lead.email, phoneEnabled && lead.phone].filter(Boolean).join(" · ") || "—"}
+                </TableCell>
+              )}
+              {groupEnabled && (
+                <TableCell className="text-muted-foreground">{lead.group_name || "—"}</TableCell>
+              )}
+              {datesEnabled && (
+                <TableCell className="text-muted-foreground">
+                  {lead.preferred_dates?.length ? lead.preferred_dates.map((d) => formatDate(d)).join(", ") : "—"}
+                </TableCell>
+              )}
+              {customFieldDefs.map((f) => (
                 <TableCell key={f.id} className="text-muted-foreground">
                   {fieldValues[lead.id]?.[f.id] || "—"}
                 </TableCell>

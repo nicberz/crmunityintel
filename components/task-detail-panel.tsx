@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Dialog } from "@/components/ui/dialog";
+import { useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,98 +18,115 @@ import {
 } from "@/lib/types";
 import type { TaskWithNames } from "@/components/tasks-table";
 
-export function TaskDetailsDialog({
+export function TaskDetailPanel({
   task,
-  open,
-  onClose,
   teamMembers,
   groups,
   hiddenFields = {},
   updateAction,
+  deleteAction,
 }: {
   task: TaskWithNames | null;
-  open: boolean;
-  onClose: () => void;
   teamMembers: { id: string; name: string }[];
   groups: TaskGroup[];
   hiddenFields?: Record<string, string>;
   updateAction: (formData: FormData) => void;
+  deleteAction: (formData: FormData) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
-  if (!task) return null;
+  useEffect(() => {
+    setIsEditing(false);
+  }, [task?.id]);
+
+  if (!task) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+        Izvēlies uzdevumu, lai redzētu detaļas.
+      </div>
+    );
+  }
 
   const group = task.group_id ? groups.find((g) => g.id === task.group_id) ?? null : null;
 
-  function handleClose() {
-    setIsEditing(false);
-    onClose();
-  }
-
   return (
-    <Dialog open={open} onClose={handleClose} title={isEditing ? "Rediģēt uzdevumu" : task.title}>
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="truncate text-sm font-semibold">{isEditing ? "Rediģēt uzdevumu" : task.title}</h2>
+        {!isEditing && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+              Rediģēt
+            </Button>
+            <form action={deleteAction}>
+              <input type="hidden" name="taskId" value={task.id} />
+              {Object.entries(hiddenFields).map(([k, v]) => (
+                <input key={k} type="hidden" name={k} value={v} />
+              ))}
+              <Button type="submit" size="sm" variant="ghost">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
+        )}
+      </div>
+
       {isEditing ? (
-        <form
-          action={updateAction}
-          onSubmit={handleClose}
-          className="space-y-3"
-        >
+        <form action={updateAction} onSubmit={() => setIsEditing(false)} className="space-y-3">
           <input type="hidden" name="taskId" value={task.id} />
           {Object.entries(hiddenFields).map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v} />
           ))}
           <div className="space-y-1.5">
-            <Label htmlFor="edit-title">Nosaukums</Label>
-            <Input id="edit-title" name="title" required defaultValue={task.title} />
+            <Label htmlFor="panel-title">Nosaukums</Label>
+            <Input id="panel-title" name="title" required defaultValue={task.title} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="edit-description">Apraksts</Label>
-            <Textarea id="edit-description" name="description" rows={3} defaultValue={task.description ?? ""} />
+            <Label htmlFor="panel-description">Apraksts</Label>
+            <Textarea id="panel-description" name="description" rows={3} defaultValue={task.description ?? ""} />
           </div>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="min-w-0 space-y-1.5">
-                <Label htmlFor="edit-priority">Prioritāte</Label>
-                <Select id="edit-priority" name="priority" defaultValue={task.priority} className="w-full">
-                  {TASK_PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {TASK_PRIORITY_LABELS[p]}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="min-w-0 space-y-1.5">
-                <Label htmlFor="edit-dueDate">Termiņš</Label>
-                <Input id="edit-dueDate" name="dueDate" type="date" defaultValue={task.due_date ?? ""} className="w-full" />
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="min-w-0 space-y-1.5">
-              <Label htmlFor="edit-assignedTo">Atbildīgais</Label>
-              <Select id="edit-assignedTo" name="assignedTo" defaultValue={task.assigned_to ?? ""} className="w-full">
-                <option value="">Nav piešķirts</option>
-                {teamMembers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
+              <Label htmlFor="panel-priority">Prioritāte</Label>
+              <Select id="panel-priority" name="priority" defaultValue={task.priority} className="w-full">
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {TASK_PRIORITY_LABELS[p]}
                   </option>
                 ))}
               </Select>
             </div>
             <div className="min-w-0 space-y-1.5">
-              <Label htmlFor="edit-groupId">Grupa</Label>
-              <Select id="edit-groupId" name="groupId" defaultValue={task.group_id ?? ""} className="w-full">
-                <option value="">Nav grupas</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </Select>
+              <Label htmlFor="panel-dueDate">Termiņš</Label>
+              <Input id="panel-dueDate" name="dueDate" type="date" defaultValue={task.due_date ?? ""} className="w-full" />
             </div>
           </div>
+          <div className="min-w-0 space-y-1.5">
+            <Label htmlFor="panel-assignedTo">Atbildīgais</Label>
+            <Select id="panel-assignedTo" name="assignedTo" defaultValue={task.assigned_to ?? ""} className="w-full">
+              <option value="">Nav piešķirts</option>
+              {teamMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <Label htmlFor="panel-groupId">Grupa</Label>
+            <Select id="panel-groupId" name="groupId" defaultValue={task.group_id ?? ""} className="w-full">
+              <option value="">Nav grupas</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div className="space-y-1.5">
-            <Label htmlFor="edit-tags">Tagi</Label>
+            <Label htmlFor="panel-tags">Tagi</Label>
             <Input
-              id="edit-tags"
+              id="panel-tags"
               name="tags"
               placeholder="piem., mārketings, steidzami"
               defaultValue={task.tags.join(", ")}
@@ -117,7 +134,7 @@ export function TaskDetailsDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Krāsa</Label>
-            <ColorSwatchPickerField initial={task.color} />
+            <PanelColorPicker initial={task.color} />
           </div>
           <div className="flex items-center gap-2">
             <Button type="submit">Saglabāt</Button>
@@ -159,27 +176,14 @@ export function TaskDetailsDialog({
               <p className="text-xs font-medium text-muted-foreground">Termiņš</p>
               <p>{task.due_date ? formatDate(task.due_date) : "—"}</p>
             </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Izveidots</p>
-              <p>{formatDate(task.created_at)}</p>
-            </div>
-            {task.archived_at && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Arhivēts</p>
-                <p>{formatDate(task.archived_at)}</p>
-              </div>
-            )}
           </div>
-          <Button type="button" onClick={() => setIsEditing(true)}>
-            Rediģēt
-          </Button>
         </div>
       )}
-    </Dialog>
+    </div>
   );
 }
 
-function ColorSwatchPickerField({ initial }: { initial: string }) {
+function PanelColorPicker({ initial }: { initial: string }) {
   const [color, setColor] = useState(initial);
   return <ColorSwatchPicker name="color" value={color} onChange={setColor} />;
 }

@@ -35,8 +35,11 @@ export async function updateSession(request: NextRequest) {
   // /set-password must stay reachable for a just-authenticated-but-passwordless user
   // without being bounced by the "authenticated user visiting an auth route" rule below.
   const isAuthCallback = path.startsWith("/auth/") || path.startsWith("/set-password");
+  // Always public, regardless of auth state — unlike /login, an authenticated user
+  // shouldn't be bounced away from it either.
+  const isAlwaysPublic = path.startsWith("/privacy");
 
-  if (!user && !isAuthRoute && !isPublicAsset && !isApiRoute && !isAuthCallback) {
+  if (!user && !isAuthRoute && !isPublicAsset && !isApiRoute && !isAuthCallback && !isAlwaysPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

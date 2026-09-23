@@ -5,7 +5,7 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TaskColorDot, TaskGroupBadge } from "@/components/ui/badge";
+import { Badge, TaskColorDot, TaskGroupBadge } from "@/components/ui/badge";
 import { TaskDetailsDialog } from "@/components/task-details-dialog";
 import { formatDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -110,6 +110,15 @@ export function TasksTable({
                     </p>
                     {task.description && (
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.description}</p>
+                    )}
+                    {task.tags.length > 0 && (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {task.tags.map((tag) => (
+                          <Badge key={tag} className="bg-muted text-[10px] text-muted-foreground">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </span>
                     )}
                   </span>
                 </button>
