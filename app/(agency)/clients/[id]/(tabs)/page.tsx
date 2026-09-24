@@ -31,7 +31,10 @@ export default async function ClientLeadsTabPage({
   const sortColumn = param(searchParams, "sort") === "status" ? "status" : "created_at";
   const sortAscending = param(searchParams, "dir") === "asc";
 
-  let leadsQuery = supabase.from("leads").select("*").eq("client_id", params.id);
+  let leadsQuery = supabase
+    .from("leads")
+    .select("*, lead_field_values(field_definition_id, value)")
+    .eq("client_id", params.id);
   if (statusFilter) leadsQuery = leadsQuery.eq("status", statusFilter as Lead["status"]);
   if (fromFilter) leadsQuery = leadsQuery.gte("created_at", fromFilter);
   if (toFilter) leadsQuery = leadsQuery.lte("created_at", `${toFilter}T23:59:59.999`);
@@ -47,19 +50,18 @@ export default async function ClientLeadsTabPage({
       .order("sort_order", { ascending: true }),
   ]);
 
-  const leadsList = (leads ?? []) as Lead[];
+  const leadsList = (leads ?? []) as (Lead & {
+    lead_field_values: Pick<LeadFieldValue, "field_definition_id" | "value">[] | null;
+  })[];
   const fieldDefs = (fieldDefsData ?? []) as LeadFieldDefinition[];
   const statusCounts = tallyLeadStatuses(((leadStatuses ?? []) as Pick<Lead, "status">[]).map((l) => l.status));
 
-  const leadIds = leadsList.map((l) => l.id);
-  const { data: fieldValuesData } = leadIds.length
-    ? await supabase.from("lead_field_values").select("*").in("lead_id", leadIds)
-    : { data: [] as LeadFieldValue[] };
-
   const fieldValues: Record<string, Record<string, string>> = {};
-  for (const fv of (fieldValuesData ?? []) as LeadFieldValue[]) {
-    if (!fieldValues[fv.lead_id]) fieldValues[fv.lead_id] = {};
-    fieldValues[fv.lead_id][fv.field_definition_id] = fv.value ?? "";
+  for (const lead of leadsList) {
+    fieldValues[lead.id] = {};
+    for (const fv of lead.lead_field_values ?? []) {
+      fieldValues[lead.id][fv.field_definition_id] = fv.value ?? "";
+    }
   }
 
   function sortLink(column: "created_at" | "status") {

@@ -1,10 +1,12 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 
 export type ProfileWithEmail = Profile & { email: string };
 
-export async function requireProfile(): Promise<ProfileWithEmail> {
+// Layouts and pages both call this; cache() makes them share one lookup per request.
+export const requireProfile = cache(async (): Promise<ProfileWithEmail> => {
   const supabase = createClient();
 
   const {
@@ -26,7 +28,7 @@ export async function requireProfile(): Promise<ProfileWithEmail> {
   }
 
   return { ...profile, email: user.email ?? "" };
-}
+});
 
 export async function requireAgencyAdmin(): Promise<ProfileWithEmail> {
   const profile = await requireProfile();
