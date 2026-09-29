@@ -13,9 +13,9 @@ import {
   collectLeadFieldValues,
   validateDefaultFields,
   assertLabelAvailable,
+  uniqueFieldKey,
   DEFAULT_FIELD_KEYS,
   DEFAULT_FIELD_SEED,
-  RESERVED_FIELD_KEYS,
   defaultFieldTypeUpdate,
 } from "@/lib/lead-fields";
 import { sendNewLeadWhatsAppNotification } from "@/lib/whatsapp";
@@ -68,11 +68,12 @@ export async function createClientAction(formData: FormData) {
   const { error: fieldsError } = await supabase.from("lead_field_definitions").insert(
     DEFAULT_FIELD_SEED.map((f) => ({
       client_id: client!.id,
-      key: f.key,
+      key: slugifyFieldKey(f.label),
       label: f.label,
       field_type: "text" as const,
       is_required: f.is_required,
       is_default: true,
+      default_kind: f.kind,
       is_enabled: true,
       sort_order: f.sort_order,
     }))
@@ -532,24 +533,14 @@ async function addLeadField(formData: FormData) {
 
   assertLabelAvailable(existing ?? [], parsed.label);
 
-  // Reserved keys stay taken even when a default field is deleted, so it can be restored and never collides with API params.
-  const existingKeys = new Set<string>([...(existing ?? []).map((d) => d.key), ...RESERVED_FIELD_KEYS]);
-  const baseKey = slugifyFieldKey(parsed.label);
-  let key = baseKey;
-  let suffix = 1;
-  while (existingKeys.has(key)) {
-    suffix += 1;
-    key = `${baseKey}_${suffix}`;
-  }
-
   const { error } = await supabase.from("lead_field_definitions").insert({
     client_id: parsed.clientId,
-    key,
+    key: uniqueFieldKey(parsed.label, (existing ?? []).map((d) => d.key)),
     label: parsed.label,
     field_type: parsed.fieldType,
     options,
     is_required: parsed.isRequired === "on",
-    sort_order: existingKeys.size,
+    sort_order: (existing ?? []).length,
   });
   if (error) throw new Error(error.message);
 
@@ -635,32 +626,33 @@ async function deleteLeadField(formData: FormData) {
 
 const restoreDefaultLeadFieldSchema = z.object({
   clientId: z.string().uuid(),
-  key: z.enum(DEFAULT_FIELD_KEYS),
+  kind: z.enum(DEFAULT_FIELD_KEYS),
 });
 
 async function restoreDefaultLeadField(formData: FormData) {
   await requireAgencyAdmin();
   const parsed = restoreDefaultLeadFieldSchema.parse({
     clientId: formData.get("clientId"),
-    key: formData.get("key"),
+    kind: formData.get("kind"),
   });
-  const seed = DEFAULT_FIELD_SEED.find((f) => f.key === parsed.key)!;
+  const seed = DEFAULT_FIELD_SEED.find((f) => f.kind === parsed.kind)!;
 
   const supabase = createServerClient();
   const { data: existing } = await supabase
     .from("lead_field_definitions")
-    .select("id, label")
+    .select("id, label, key")
     .eq("client_id", parsed.clientId);
 
   assertLabelAvailable(existing ?? [], seed.label);
 
   const { error } = await supabase.from("lead_field_definitions").insert({
     client_id: parsed.clientId,
-    key: seed.key,
+    key: uniqueFieldKey(seed.label, (existing ?? []).map((d) => d.key)),
     label: seed.label,
     field_type: "text",
     is_required: seed.is_required,
     is_default: true,
+    default_kind: seed.kind,
     is_enabled: true,
     sort_order: seed.sort_order,
   });
@@ -696,7 +688,7 @@ async function updateDefaultLeadField(formData: FormData) {
   const supabase = createServerClient();
   const { data: existing } = await supabase
     .from("lead_field_definitions")
-    .select("id, label, key")
+    .select("id, label, default_kind")
     .eq("client_id", parsed.clientId);
 
   assertLabelAvailable(existing ?? [], parsed.label, parsed.fieldId);
@@ -708,7 +700,7 @@ async function updateDefaultLeadField(formData: FormData) {
       label: parsed.label,
       is_required: parsed.isRequired === "on",
       is_enabled: parsed.isEnabled === "on",
-      ...defaultFieldTypeUpdate(current?.key, parsed.fieldType, parsed.options),
+      ...defaultFieldTypeUpdate(current?.default_kind, parsed.fieldType, parsed.options),
     })
     .eq("id", parsed.fieldId)
     .eq("client_id", parsed.clientId)

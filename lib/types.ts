@@ -90,6 +90,7 @@ export interface LeadFieldDefinition {
   options: string[] | null;
   is_required: boolean;
   is_default: boolean;
+  default_kind: "name" | "email" | "phone" | "group_name" | "preferred_dates" | null;
   is_enabled: boolean;
   sort_order: number;
   created_at: string;

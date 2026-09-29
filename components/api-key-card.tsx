@@ -4,7 +4,6 @@ import { useFormState, useFormStatus } from "react-dom";
 import type { ApiKeyState } from "@/app/(agency)/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDefaultFieldDef, DEFAULT_FIELD_API_PARAM, type DefaultFieldKey } from "@/lib/lead-fields";
 import type { LeadFieldDefinition } from "@/lib/types";
 
 const initialState: ApiKeyState = { status: "idle", message: "" };
@@ -31,27 +30,28 @@ function customFieldPlaceholder(field: LeadFieldDefinition): string | number {
   }
 }
 
+const DEFAULT_TEXT_EXAMPLES: Record<string, string> = {
+  name: "Anna Kalniņa",
+  phone: "+371 20000000",
+  group_name: "Vasaras grupa",
+};
+
+function defaultFieldPlaceholder(field: LeadFieldDefinition): string | number | string[] {
+  if (field.default_kind === "email") return "anna@piemers.lv";
+  if (field.default_kind === "preferred_dates") return ["2026-06-01"];
+  if (field.field_type === "text" && field.default_kind) return DEFAULT_TEXT_EXAMPLES[field.default_kind] ?? "...";
+  return customFieldPlaceholder(field);
+}
+
+// Every field is sent under its own key, in the same order as Settings → Leadu lauki.
 function buildExamplePayload(defaultFields: LeadFieldDefinition[], customFields: LeadFieldDefinition[]) {
   const example: Record<string, unknown> = {};
-
-  const emailField = getDefaultFieldDef(defaultFields, "email");
-  const phoneField = getDefaultFieldDef(defaultFields, "phone");
-  const groupField = getDefaultFieldDef(defaultFields, "group_name");
-  const datesField = getDefaultFieldDef(defaultFields, "preferred_dates");
-
-  if (phoneField?.is_enabled) {
-    example.phone = phoneField.field_type === "text" ? "+371 20000000" : customFieldPlaceholder(phoneField);
+  for (const field of defaultFields.filter((f) => f.is_enabled)) {
+    example[field.key] = defaultFieldPlaceholder(field);
   }
-  if (emailField?.is_enabled) example.email = "anna@piemers.lv";
-  if (groupField?.is_enabled) {
-    example.group = groupField.field_type === "text" ? "Vasaras grupa" : customFieldPlaceholder(groupField);
-  }
-  if (datesField?.is_enabled ?? false) example.dates = ["2026-06-01"];
-
   for (const field of customFields.filter((f) => f.is_enabled)) {
     example[field.key] = customFieldPlaceholder(field);
   }
-
   return example;
 }
 
@@ -71,13 +71,9 @@ export function ApiKeyCard({
   const [state, formAction] = useFormState(generateAction, initialState);
 
   const examplePayload = buildExamplePayload(defaultFields, customFields);
-  const requiredKeys = new Set([
-    ...defaultFields
-      .filter((f) => f.is_enabled && f.is_required)
-      .map((f) => DEFAULT_FIELD_API_PARAM[f.key as DefaultFieldKey])
-      .filter((param): param is string => param !== null),
-    ...customFields.filter((f) => f.is_enabled && f.is_required).map((f) => f.key),
-  ]);
+  const requiredKeys = new Set(
+    [...defaultFields, ...customFields].filter((f) => f.is_enabled && f.is_required).map((f) => f.key)
+  );
 
   return (
     <Card>

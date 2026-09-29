@@ -6,12 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { FIELD_TYPE_LABELS } from "@/components/lead-field-editor";
-import {
-  DEFAULT_FIELD_SEED,
-  DEFAULT_FIELD_API_PARAM,
-  TYPE_EDITABLE_DEFAULT_KEYS,
-  type DefaultFieldKey,
-} from "@/lib/lead-fields";
+import { DEFAULT_FIELD_SEED, TYPE_EDITABLE_DEFAULT_KEYS } from "@/lib/lead-fields";
 import type { ActionResult } from "@/lib/action-result";
 import type { LeadFieldDefinition, LeadFieldType } from "@/lib/types";
 
@@ -22,16 +17,20 @@ const FIXED_TYPE_LABELS: Record<string, string> = {
   preferred_dates: "Datumu saraksts",
 };
 
+function isTypeEditable(field: LeadFieldDefinition): boolean {
+  return !!field.default_kind && TYPE_EDITABLE_DEFAULT_KEYS.includes(field.default_kind);
+}
+
 function typeLabel(field: LeadFieldDefinition): string {
-  return TYPE_EDITABLE_DEFAULT_KEYS.includes(field.key)
+  return isTypeEditable(field)
     ? FIELD_TYPE_LABELS[field.field_type]
-    : FIXED_TYPE_LABELS[field.key] ?? FIELD_TYPE_LABELS[field.field_type];
+    : FIXED_TYPE_LABELS[field.default_kind ?? ""] ?? FIELD_TYPE_LABELS[field.field_type];
 }
 
 function TypeFields({ field }: { field: LeadFieldDefinition }) {
   const [fieldType, setFieldType] = useState<LeadFieldType>(field.field_type);
 
-  if (!TYPE_EDITABLE_DEFAULT_KEYS.includes(field.key)) {
+  if (!isTypeEditable(field)) {
     return (
       <p className="text-xs text-muted-foreground">
         Tips: {typeLabel(field)} — šim laukam tipu mainīt nevar.
@@ -95,7 +94,7 @@ export function DefaultLeadFieldEditor({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const deletedDefaults = DEFAULT_FIELD_SEED.filter((seed) => !fields.some((f) => f.key === seed.key));
+  const deletedDefaults = DEFAULT_FIELD_SEED.filter((seed) => !fields.some((f) => f.default_kind === seed.kind));
 
   function submit(action: FieldAction, onSuccess?: () => void) {
     return async (formData: FormData) => {
@@ -156,13 +155,7 @@ export function DefaultLeadFieldEditor({
             >
               <div className="min-w-0">
                 <span className="font-medium">{field.label}</span>{" "}
-                {DEFAULT_FIELD_API_PARAM[field.key as DefaultFieldKey] ? (
-                  <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                    {DEFAULT_FIELD_API_PARAM[field.key as DefaultFieldKey]}
-                  </code>
-                ) : (
-                  <span className="text-xs text-muted-foreground">nav API</span>
-                )}{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">{field.key}</code>{" "}
                 <span className="text-muted-foreground">
                   ({typeLabel(field)}
                   {field.field_type === "select" && field.options?.length ? `: ${field.options.join(", ")}` : ""},{" "}
@@ -195,9 +188,9 @@ export function DefaultLeadFieldEditor({
           </p>
           <div className="flex flex-wrap gap-2">
             {deletedDefaults.map((seed) => (
-              <form key={seed.key} action={submit(restoreAction)}>
+              <form key={seed.kind} action={submit(restoreAction)}>
                 <HiddenFields values={hiddenFields} />
-                <input type="hidden" name="key" value={seed.key} />
+                <input type="hidden" name="kind" value={seed.kind} />
                 <Button type="submit" variant="outline" size="sm">
                   + {seed.label}
                 </Button>
