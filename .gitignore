@@ -16,6 +16,9 @@
 # db schema (kept out of the public repo — see db/migrations locally)
 /db/migrations/*.sql
 
+# Claude Code project notes (local only)
+/CLAUDE.md
+
 # misc
 .DS_Store
 *.pem

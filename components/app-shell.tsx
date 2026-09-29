@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ReportBugButton } from "@/components/report-bug-button";
@@ -12,7 +11,7 @@ import { cn } from "@/lib/utils";
 interface NavItem {
   href: string;
   label: string;
-  icon?: LucideIcon;
+  icon?: React.ReactNode;
 }
 
 interface CurrentUser {
@@ -102,7 +101,6 @@ export function AppShell({
           </div>
           <nav className="flex flex-1 flex-col gap-1 p-3">
             {navItems.map((item) => {
-              const Icon = item.icon;
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
@@ -113,7 +111,7 @@ export function AppShell({
                     active && "border-primary bg-primary/10 text-primary"
                   )}
                 >
-                  {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                  {item.icon}
                   {item.label}
                 </Link>
               );

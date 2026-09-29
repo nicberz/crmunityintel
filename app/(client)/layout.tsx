@@ -5,12 +5,15 @@ import { AppShell } from "@/components/app-shell";
 import { NotificationBell } from "@/components/notification-bell";
 import { getDueRemindersAction, dismissReminderAction } from "@/app/(client)/actions";
 
+const iconClass = "h-4 w-4 shrink-0";
+
+// Icons are passed as rendered elements: AppShell is a client component, and component functions can't cross the server/client boundary.
 const navItems = [
-  { href: "/overview", label: "Pārskats", icon: LayoutDashboard },
-  { href: "/leads", label: "Leadi", icon: Users },
-  { href: "/calendar", label: "Kalendārs", icon: CalendarDays },
-  { href: "/tasks", label: "Uzdevumi", icon: ListTodo },
-  { href: "/settings", label: "Iestatījumi", icon: Settings },
+  { href: "/overview", label: "Pārskats", icon: <LayoutDashboard className={iconClass} /> },
+  { href: "/leads", label: "Leadi", icon: <Users className={iconClass} /> },
+  { href: "/calendar", label: "Kalendārs", icon: <CalendarDays className={iconClass} /> },
+  { href: "/tasks", label: "Uzdevumi", icon: <ListTodo className={iconClass} /> },
+  { href: "/settings", label: "Iestatījumi", icon: <Settings className={iconClass} /> },
 ];
 
 export default async function ClientAreaLayout({ children }: { children: React.ReactNode }) {
