@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadFieldInputs } from "@/components/lead-field-inputs";
+import { TypedFieldInput } from "@/components/typed-field-input";
 import { getDefaultFieldDef } from "@/lib/lead-fields";
 import { formatDate } from "@/lib/dates";
 import type { Lead, LeadFieldDefinition } from "@/lib/types";
@@ -34,11 +35,11 @@ export function LeadEditForm({ lead, fieldDefs, customFields, updateAction }: Le
   const phoneField = getDefaultFieldDef(fieldDefs, "phone");
   const groupField = getDefaultFieldDef(fieldDefs, "group_name");
   const datesField = getDefaultFieldDef(fieldDefs, "preferred_dates");
-  const nameEnabled = nameField?.is_enabled ?? true;
-  const emailEnabled = emailField?.is_enabled ?? true;
-  const phoneEnabled = phoneField?.is_enabled ?? true;
-  const groupEnabled = groupField?.is_enabled ?? true;
-  const datesEnabled = datesField?.is_enabled ?? true;
+  const nameEnabled = nameField?.is_enabled ?? false;
+  const emailEnabled = emailField?.is_enabled ?? false;
+  const phoneEnabled = phoneField?.is_enabled ?? false;
+  const groupEnabled = groupField?.is_enabled ?? false;
+  const datesEnabled = datesField?.is_enabled ?? false;
 
   if (!isEditing) {
     return (
@@ -106,7 +107,8 @@ export function LeadEditForm({ lead, fieldDefs, customFields, updateAction }: Le
       {nameEnabled && (
         <div className="space-y-1.5">
           <Label htmlFor="edit-name">{nameField?.label ?? "Vārds"}</Label>
-          <Input
+          <TypedFieldInput
+            field={nameField}
             id="edit-name"
             name="name"
             required={nameField?.is_required ?? true}
@@ -131,7 +133,8 @@ export function LeadEditForm({ lead, fieldDefs, customFields, updateAction }: Le
           {phoneEnabled && (
             <div className="space-y-1.5">
               <Label htmlFor="edit-phone">{phoneField?.label ?? "Telefons"}</Label>
-              <Input
+              <TypedFieldInput
+                field={phoneField}
                 id="edit-phone"
                 name="phone"
                 required={phoneField?.is_required}
@@ -146,7 +149,8 @@ export function LeadEditForm({ lead, fieldDefs, customFields, updateAction }: Le
           {groupEnabled && (
             <div className="space-y-1.5">
               <Label htmlFor="edit-group_name">{groupField?.label ?? "Grupa"}</Label>
-              <Input
+              <TypedFieldInput
+                field={groupField}
                 id="edit-group_name"
                 name="group_name"
                 required={groupField?.is_required}

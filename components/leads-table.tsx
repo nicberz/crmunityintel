@@ -55,11 +55,11 @@ export function LeadsTable({
   const phoneField = getDefaultFieldDef(fieldDefs, "phone");
   const groupField = getDefaultFieldDef(fieldDefs, "group_name");
   const datesField = getDefaultFieldDef(fieldDefs, "preferred_dates");
-  const nameEnabled = nameField?.is_enabled ?? true;
-  const emailEnabled = emailField?.is_enabled ?? true;
-  const phoneEnabled = phoneField?.is_enabled ?? true;
-  const groupEnabled = groupField?.is_enabled ?? true;
-  const datesEnabled = datesField?.is_enabled ?? true;
+  const nameEnabled = nameField?.is_enabled ?? false;
+  const emailEnabled = emailField?.is_enabled ?? false;
+  const phoneEnabled = phoneField?.is_enabled ?? false;
+  const groupEnabled = groupField?.is_enabled ?? false;
+  const datesEnabled = datesField?.is_enabled ?? false;
   const contactsEnabled = emailEnabled || phoneEnabled;
   const contactsLabel = [emailEnabled && emailField?.label, phoneEnabled && phoneField?.label]
     .filter(Boolean)
@@ -224,7 +224,15 @@ export function LeadsTable({
                   <LeadStatusBadge status={lead.status} label={LEAD_STATUS_LABELS[lead.status]} />
                 )}
               </TableCell>
-              <TableCell className="text-muted-foreground">{formatDate(lead.created_at)}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {nameEnabled ? (
+                  formatDate(lead.created_at)
+                ) : (
+                  <Link href={`${detailHrefBase}/${lead.id}`} className="hover:underline">
+                    {formatDate(lead.created_at)}
+                  </Link>
+                )}
+              </TableCell>
             </TableRow>
           ))}
           {leads.length === 0 && (

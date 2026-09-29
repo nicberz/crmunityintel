@@ -16,13 +16,18 @@ export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
-const leadSubmissionSchema = z.object({
-  phone: z.string().trim().optional().or(z.literal("")),
-  email: z.string().trim().email("email must be valid").optional().or(z.literal("")),
-  group: z.string().trim().optional(),
-  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dates must be YYYY-MM-DD")).optional(),
-  fields: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
-});
+// phone/group may be configured as a number field, so numbers are accepted and normalised to strings.
+const stringOrNumber = z.union([z.string(), z.number()]).transform((v) => String(v).trim());
+
+// Flat body: default params below plus each custom field's key at the same level. Unknown keys are ignored.
+const leadSubmissionSchema = z
+  .object({
+    phone: stringOrNumber.optional(),
+    email: z.string().trim().email("email must be valid").optional().or(z.literal("")),
+    group: stringOrNumber.optional(),
+    dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dates must be YYYY-MM-DD")).optional(),
+  })
+  .passthrough();
 
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get("x-api-key");
@@ -72,6 +77,8 @@ export async function POST(request: NextRequest) {
     email = resolveAndCheckDefaultField(emailDef, parsed.data.email ?? "", "", (v) => !v);
     group = resolveAndCheckDefaultField(groupDef, parsed.data.group ?? "", "", (v) => !v);
     dates = resolveAndCheckDefaultField(datesDef, parsed.data.dates ?? [], [] as string[], (v) => v.length === 0);
+    if (phone && phoneDef) phone = validateFieldValue(phoneDef, phone);
+    if (group && groupDef) group = validateFieldValue(groupDef, group);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Missing required field" },
@@ -79,11 +86,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const submittedFields = parsed.data.fields ?? {};
+  const submitted = parsed.data as Record<string, unknown>;
   const fieldValues: { field_definition_id: string; value: string }[] = [];
 
   for (const def of customDefinitions) {
-    const rawValue = submittedFields[def.key];
+    const rawValue = submitted[def.key];
     if (rawValue === undefined || rawValue === null || rawValue === "") {
       if (def.is_required) {
         return NextResponse.json(
@@ -92,6 +99,12 @@ export async function POST(request: NextRequest) {
         );
       }
       continue;
+    }
+    if (typeof rawValue !== "string" && typeof rawValue !== "number") {
+      return NextResponse.json(
+        { error: `Field "${def.key}" must be a string or number` },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     try {

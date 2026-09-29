@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import type { ActionResult } from "@/lib/action-result";
 import type { LeadFieldDefinition, LeadFieldType } from "@/lib/types";
 
-const FIELD_TYPE_LABELS: Record<LeadFieldType, string> = {
+type FieldAction = (formData: FormData) => Promise<ActionResult>;
+
+export const FIELD_TYPE_LABELS: Record<LeadFieldType, string> = {
   text: "Teksts",
   number: "Skaitlis",
   date: "Datums",
@@ -35,15 +38,32 @@ export function LeadFieldEditor({
 }: {
   fields: LeadFieldDefinition[];
   hiddenFields?: Record<string, string>;
-  addAction: (formData: FormData) => void;
-  updateAction: (formData: FormData) => void;
-  deleteAction: (formData: FormData) => void;
+  addAction: FieldAction;
+  updateAction: FieldAction;
+  deleteAction: FieldAction;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newFieldType, setNewFieldType] = useState<LeadFieldType>("text");
+  const [error, setError] = useState<string | null>(null);
+  const addFormRef = useRef<HTMLFormElement>(null);
+
+  function resetAddForm() {
+    addFormRef.current?.reset();
+    setNewFieldType("text");
+  }
+
+  function submit(action: FieldAction, onSuccess?: () => void) {
+    return async (formData: FormData) => {
+      setError(null);
+      const result = await action(formData);
+      if (result.error) setError(result.error);
+      else onSuccess?.();
+    };
+  }
 
   return (
     <div className="space-y-4">
+      {error && <p className="text-sm text-destructive">{error}</p>}
       <ul className="space-y-2">
         {fields.map((field) =>
           editingId === field.id ? (
@@ -51,8 +71,11 @@ export function LeadFieldEditor({
               <EditFieldForm
                 field={field}
                 hiddenFields={hiddenFields}
-                action={updateAction}
-                onCancel={() => setEditingId(null)}
+                action={submit(updateAction, () => setEditingId(null))}
+                onCancel={() => {
+                  setError(null);
+                  setEditingId(null);
+                }}
               />
             </li>
           ) : (
@@ -75,7 +98,7 @@ export function LeadFieldEditor({
                 <Button type="button" variant="outline" size="sm" onClick={() => setEditingId(field.id)}>
                   Rediģēt
                 </Button>
-                <form action={deleteAction}>
+                <form action={submit(deleteAction)}>
                   <HiddenFields values={hiddenFields} />
                   <input type="hidden" name="fieldId" value={field.id} />
                   <Button type="submit" variant="destructive" size="sm">
@@ -89,12 +112,12 @@ export function LeadFieldEditor({
         {fields.length === 0 && <p className="text-sm text-muted-foreground">Vēl nav pielāgotu lauku.</p>}
       </ul>
 
-      <form action={addAction} className="space-y-3 border-t border-border pt-4">
+      <form ref={addFormRef} action={submit(addAction, resetAddForm)} className="space-y-3 border-t border-border pt-4">
         <HiddenFields values={hiddenFields} />
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="new-field-label">Lauka nosaukums</Label>
-            <Input id="new-field-label" name="label" required placeholder="Uzvārds" />
+            <Input id="new-field-label" name="label" required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="new-field-type">Tips</Label>
@@ -138,7 +161,7 @@ function EditFieldForm({
 }: {
   field: LeadFieldDefinition;
   hiddenFields: Record<string, string>;
-  action: (formData: FormData) => void;
+  action: (formData: FormData) => Promise<void>;
   onCancel: () => void;
 }) {
   const [fieldType, setFieldType] = useState<LeadFieldType>(field.field_type);

@@ -55,3 +55,11 @@ export async function requireClientUser(): Promise<ProfileWithEmail> {
   }
   return profile;
 }
+
+export async function requireClientAdmin(): Promise<ProfileWithEmail> {
+  const profile = await requireClientUser();
+  if (!profile.is_client_admin) {
+    throw new Error("Šī darbība pieejama tikai klienta administratoram.");
+  }
+  return profile;
+}

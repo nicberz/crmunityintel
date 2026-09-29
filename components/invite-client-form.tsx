@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import { inviteClientUserAction, type InviteState } from "@/app/(agency)/actions";
+import type { InviteState } from "@/app/(agency)/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +17,20 @@ function SubmitButton() {
   );
 }
 
-export function InviteClientForm({ clientId }: { clientId: string }) {
-  const [state, formAction] = useFormState(inviteClientUserAction, initialState);
+export function InviteClientForm({
+  action,
+  clientId,
+  allowAdmin = false,
+}: {
+  action: (prevState: InviteState, formData: FormData) => Promise<InviteState>;
+  clientId?: string;
+  allowAdmin?: boolean;
+}) {
+  const [state, formAction] = useFormState(action, initialState);
 
   return (
     <form action={formAction} className="space-y-3">
-      <input type="hidden" name="clientId" value={clientId} />
+      {clientId && <input type="hidden" name="clientId" value={clientId} />}
       <div className="space-y-1.5">
         <Label htmlFor="email">E-pasts</Label>
         <Input id="email" name="email" type="email" required placeholder="klients@piemers.lv" />
@@ -31,13 +39,15 @@ export function InviteClientForm({ clientId }: { clientId: string }) {
         <Label htmlFor="fullName">Vārds (nav obligāts)</Label>
         <Input id="fullName" name="fullName" placeholder="Jānis Bērziņš" />
       </div>
+      {allowAdmin && (
+        <label htmlFor="isClientAdmin" className="flex items-center gap-2 text-sm">
+          <input id="isClientAdmin" type="checkbox" name="isClientAdmin" className="h-4 w-4" />
+          Klienta administrators (API, leadu lauki, datu dzēšana, komandas ielūgšana)
+        </label>
+      )}
       <SubmitButton />
-      {state.status === "success" && (
-        <p className="text-sm text-emerald-400">{state.message}</p>
-      )}
-      {state.status === "error" && (
-        <p className="text-sm text-destructive">{state.message}</p>
-      )}
+      {state.status === "success" && <p className="text-sm text-emerald-400">{state.message}</p>}
+      {state.status === "error" && <p className="text-sm text-destructive">{state.message}</p>}
     </form>
   );
 }

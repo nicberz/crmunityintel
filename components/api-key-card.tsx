@@ -1,10 +1,10 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import { generateClientApiKeyAction, type ApiKeyState } from "@/app/(agency)/actions";
+import type { ApiKeyState } from "@/app/(agency)/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDefaultFieldDef } from "@/lib/lead-fields";
+import { getDefaultFieldDef, DEFAULT_FIELD_API_PARAM, type DefaultFieldKey } from "@/lib/lead-fields";
 import type { LeadFieldDefinition } from "@/lib/types";
 
 const initialState: ApiKeyState = { status: "idle", message: "" };
@@ -39,36 +39,45 @@ function buildExamplePayload(defaultFields: LeadFieldDefinition[], customFields:
   const groupField = getDefaultFieldDef(defaultFields, "group_name");
   const datesField = getDefaultFieldDef(defaultFields, "preferred_dates");
 
-  if (phoneField?.is_enabled ?? true) example.phone = "+371 20000000";
-  if (emailField?.is_enabled ?? true) example.email = "anna@piemers.lv";
-  if (groupField?.is_enabled ?? true) example.group = "Neobligāti";
-  if (datesField?.is_enabled ?? true) example.dates = ["2026-06-01"];
+  if (phoneField?.is_enabled) {
+    example.phone = phoneField.field_type === "text" ? "+371 20000000" : customFieldPlaceholder(phoneField);
+  }
+  if (emailField?.is_enabled) example.email = "anna@piemers.lv";
+  if (groupField?.is_enabled) {
+    example.group = groupField.field_type === "text" ? "Vasaras grupa" : customFieldPlaceholder(groupField);
+  }
+  if (datesField?.is_enabled ?? false) example.dates = ["2026-06-01"];
 
-  const enabledCustomFields = customFields.filter((f) => f.is_enabled);
-  if (enabledCustomFields.length > 0) {
-    example.fields = Object.fromEntries(enabledCustomFields.map((f) => [f.key, customFieldPlaceholder(f)]));
+  for (const field of customFields.filter((f) => f.is_enabled)) {
+    example[field.key] = customFieldPlaceholder(field);
   }
 
   return example;
 }
 
 export function ApiKeyCard({
+  generateAction,
   clientId,
   apiKeyPrefix,
   defaultFields,
   customFields,
 }: {
-  clientId: string;
+  generateAction: (prevState: ApiKeyState, formData: FormData) => Promise<ApiKeyState>;
+  clientId?: string;
   apiKeyPrefix: string | null;
   defaultFields: LeadFieldDefinition[];
   customFields: LeadFieldDefinition[];
 }) {
-  const [state, formAction] = useFormState(generateClientApiKeyAction, initialState);
+  const [state, formAction] = useFormState(generateAction, initialState);
 
   const examplePayload = buildExamplePayload(defaultFields, customFields);
-  const requiredKeys = new Set(
-    [...defaultFields, ...customFields].filter((f) => f.is_enabled && f.is_required).map((f) => f.key)
-  );
+  const requiredKeys = new Set([
+    ...defaultFields
+      .filter((f) => f.is_enabled && f.is_required)
+      .map((f) => DEFAULT_FIELD_API_PARAM[f.key as DefaultFieldKey])
+      .filter((param): param is string => param !== null),
+    ...customFields.filter((f) => f.is_enabled && f.is_required).map((f) => f.key),
+  ]);
 
   return (
     <Card>
@@ -98,7 +107,7 @@ export function ApiKeyCard({
           Pašreizējā atslēga: {apiKeyPrefix ? <code>{apiKeyPrefix}…</code> : "nav ģenerēta"}
         </p>
         <form action={formAction}>
-          <input type="hidden" name="clientId" value={clientId} />
+          {clientId && <input type="hidden" name="clientId" value={clientId} />}
           <SubmitButton hasKey={!!apiKeyPrefix} />
         </form>
         {state.status === "success" && (

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { LeadFieldInputs } from "@/components/lead-field-inputs";
+import { TypedFieldInput } from "@/components/typed-field-input";
 import { getDefaultFieldDef } from "@/lib/lead-fields";
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, type LeadFieldDefinition } from "@/lib/types";
 
@@ -51,11 +52,11 @@ export function AddLeadForm({
   const phoneField = getDefaultFieldDef(fieldDefs, "phone");
   const groupField = getDefaultFieldDef(fieldDefs, "group_name");
   const datesField = getDefaultFieldDef(fieldDefs, "preferred_dates");
-  const nameEnabled = nameField?.is_enabled ?? true;
-  const emailEnabled = emailField?.is_enabled ?? true;
-  const phoneEnabled = phoneField?.is_enabled ?? true;
-  const groupEnabled = groupField?.is_enabled ?? true;
-  const datesEnabled = datesField?.is_enabled ?? true;
+  const nameEnabled = nameField?.is_enabled ?? false;
+  const emailEnabled = emailField?.is_enabled ?? false;
+  const phoneEnabled = phoneField?.is_enabled ?? false;
+  const groupEnabled = groupField?.is_enabled ?? false;
+  const datesEnabled = datesField?.is_enabled ?? false;
 
   return (
     <form ref={formRef} action={formAction} className="space-y-3">
@@ -65,7 +66,8 @@ export function AddLeadForm({
       {nameEnabled && (
         <div className="space-y-1.5">
           <Label htmlFor="add-lead-name">{nameField?.label ?? "Vārds"}</Label>
-          <Input
+          <TypedFieldInput
+            field={nameField}
             id="add-lead-name"
             name="name"
             required={nameField?.is_required ?? true}
@@ -90,7 +92,8 @@ export function AddLeadForm({
           {phoneEnabled && (
             <div className="space-y-1.5">
               <Label htmlFor="add-lead-phone">{phoneField?.label ?? "Telefons"}</Label>
-              <Input
+              <TypedFieldInput
+                field={phoneField}
                 id="add-lead-phone"
                 name="phone"
                 required={phoneField?.is_required}
@@ -105,7 +108,8 @@ export function AddLeadForm({
           {groupEnabled && (
             <div className="space-y-1.5">
               <Label htmlFor="add-lead-group_name">{groupField?.label ?? "Grupa"}</Label>
-              <Input
+              <TypedFieldInput
+                field={groupField}
                 id="add-lead-group_name"
                 name="group_name"
                 required={groupField?.is_required}

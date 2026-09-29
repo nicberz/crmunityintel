@@ -45,6 +45,7 @@ export interface Profile {
   client_id: string | null;
   full_name: string | null;
   email: string | null;
+  is_client_admin: boolean;
   created_at: string;
 }
 

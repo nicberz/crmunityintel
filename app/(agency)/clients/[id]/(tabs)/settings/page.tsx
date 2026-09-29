@@ -7,7 +7,12 @@ import {
   updateLeadFieldAction,
   deleteLeadFieldAction,
   updateDefaultLeadFieldAction,
+  restoreDefaultLeadFieldAction,
+  inviteClientUserAction,
+  generateClientApiKeyAction,
+  setClientAdminAction,
 } from "@/app/(agency)/actions";
+import { ClientUsersList, type ClientUserRow } from "@/components/client-users-list";
 import { summarizeMetrics, commissionConfigFromClient, formatEur } from "@/lib/commission";
 import { formatDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
@@ -27,7 +32,7 @@ import type { AdMetricsDaily, Client, LeadFieldDefinition } from "@/lib/types";
 export default async function ClientSettingsTabPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
 
-  const [{ data: client }, { data: metrics }, { data: fieldDefsData }] = await Promise.all([
+  const [{ data: client }, { data: metrics }, { data: fieldDefsData }, { data: usersData }] = await Promise.all([
     supabase.from("clients").select("*").eq("id", params.id).single(),
     supabase
       .from("ad_metrics_daily")
@@ -39,6 +44,12 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
       .select("*")
       .eq("client_id", params.id)
       .order("sort_order", { ascending: true }),
+    supabase
+      .from("profiles")
+      .select("id, email, full_name, is_client_admin")
+      .eq("client_id", params.id)
+      .eq("role", "client_user")
+      .order("email", { ascending: true }),
   ]);
 
   if (!client) notFound();
@@ -48,6 +59,7 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
   const fieldDefs = (fieldDefsData ?? []) as LeadFieldDefinition[];
   const defaultFields = fieldDefs.filter((f) => f.is_default);
   const customFields = fieldDefs.filter((f) => !f.is_default);
+  const clientUsers = (usersData ?? []) as ClientUserRow[];
   const summary = summarizeMetrics(metricsList, commissionConfigFromClient(typedClient));
 
   return (
@@ -160,17 +172,31 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
               <CardTitle>Uzaicināt klienta lietotāju</CardTitle>
             </CardHeader>
             <CardContent>
-              <InviteClientForm clientId={typedClient.id} />
+              <InviteClientForm action={inviteClientUserAction} clientId={typedClient.id} allowAdmin />
             </CardContent>
           </Card>
 
           <ApiKeyCard
+            generateAction={generateClientApiKeyAction}
             clientId={typedClient.id}
             apiKeyPrefix={typedClient.api_key_prefix}
             defaultFields={defaultFields}
             customFields={customFields}
           />
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Klienta lietotāji</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Klienta administrators savā portālā var pārvaldīt API atslēgu, leadu laukus, dzēst datus un ielūgt
+              komandu. Administratora tiesības var piešķirt tikai aģentūra.
+            </p>
+            <ClientUsersList users={clientUsers} clientId={typedClient.id} setAdminAction={setClientAdminAction} />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -196,6 +222,8 @@ export default async function ClientSettingsTabPage({ params }: { params: { id: 
               fields={defaultFields}
               hiddenFields={{ clientId: typedClient.id }}
               updateAction={updateDefaultLeadFieldAction}
+              deleteAction={deleteLeadFieldAction}
+              restoreAction={restoreDefaultLeadFieldAction}
             />
           </CardContent>
         </Card>

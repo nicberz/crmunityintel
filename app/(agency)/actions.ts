@@ -13,9 +13,13 @@ import {
   collectLeadFieldValues,
   validateDefaultFields,
   assertLabelAvailable,
+  DEFAULT_FIELD_KEYS,
   DEFAULT_FIELD_SEED,
+  RESERVED_FIELD_KEYS,
+  defaultFieldTypeUpdate,
 } from "@/lib/lead-fields";
 import { sendNewLeadWhatsAppNotification } from "@/lib/whatsapp";
+import { runAction, type ActionResult } from "@/lib/action-result";
 import { fetchDueReminders, type DueReminder } from "@/lib/calendar-queries";
 import { parseTagsInput } from "@/lib/utils";
 import {
@@ -27,6 +31,23 @@ import {
 } from "@/lib/types";
 
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Nederīga krāsa");
+
+// Lead-field settings actions return their error so the forms can show it inline instead of crashing.
+export async function addLeadFieldAction(formData: FormData): Promise<ActionResult> {
+  return runAction(() => addLeadField(formData));
+}
+export async function updateLeadFieldAction(formData: FormData): Promise<ActionResult> {
+  return runAction(() => updateLeadField(formData));
+}
+export async function deleteLeadFieldAction(formData: FormData): Promise<ActionResult> {
+  return runAction(() => deleteLeadField(formData));
+}
+export async function updateDefaultLeadFieldAction(formData: FormData): Promise<ActionResult> {
+  return runAction(() => updateDefaultLeadField(formData));
+}
+export async function restoreDefaultLeadFieldAction(formData: FormData): Promise<ActionResult> {
+  return runAction(() => restoreDefaultLeadField(formData));
+}
 
 const createClientSchema = z.object({
   name: z.string().trim().min(1, "Nosaukums ir obligāts"),
@@ -175,6 +196,7 @@ const inviteUserSchema = z.object({
   clientId: z.string().uuid(),
   email: z.string().email("Nederīgs e-pasts"),
   fullName: z.string().trim().optional(),
+  isClientAdmin: z.string().nullish(),
 });
 
 export interface InviteState {
@@ -192,6 +214,7 @@ export async function inviteClientUserAction(
     clientId: formData.get("clientId"),
     email: formData.get("email"),
     fullName: formData.get("fullName") || undefined,
+    isClientAdmin: formData.get("isClientAdmin"),
   });
 
   if (!parseResult.success) {
@@ -200,7 +223,7 @@ export async function inviteClientUserAction(
   const parsed = parseResult.data;
 
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.inviteUserByEmail(parsed.email, {
+  const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(parsed.email, {
     data: {
       role: "client_user",
       client_id: parsed.clientId,
@@ -212,8 +235,47 @@ export async function inviteClientUserAction(
     return { status: "error", message: error.message };
   }
 
+  // Set directly rather than via invite metadata, so the profile trigger never has to trust that flag.
+  if (parsed.isClientAdmin === "on" && invited.user) {
+    const { error: adminError } = await admin
+      .from("profiles")
+      .update({ is_client_admin: true })
+      .eq("id", invited.user.id);
+    if (adminError) {
+      return { status: "error", message: `Ielūgums nosūtīts, bet neizdevās piešķirt administratora tiesības: ${adminError.message}` };
+    }
+  }
+
   revalidatePath(`/clients/${parsed.clientId}/settings`);
   return { status: "success", message: `Ielūgums nosūtīts uz ${parsed.email}.` };
+}
+
+const setClientAdminSchema = z.object({
+  profileId: z.string().uuid(),
+  clientId: z.string().uuid(),
+  isClientAdmin: z.enum(["true", "false"]),
+});
+
+export async function setClientAdminAction(formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireAgencyAdmin();
+    const parsed = setClientAdminSchema.parse({
+      profileId: formData.get("profileId"),
+      clientId: formData.get("clientId"),
+      isClientAdmin: formData.get("isClientAdmin"),
+    });
+
+    const supabase = createServerClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_client_admin: parsed.isClientAdmin === "true" })
+      .eq("id", parsed.profileId)
+      .eq("client_id", parsed.clientId)
+      .eq("role", "client_user");
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/clients/${parsed.clientId}/settings`);
+  });
 }
 
 export interface ApiKeyState {
@@ -447,7 +509,7 @@ const addLeadFieldSchema = z.object({
   isRequired: z.string().nullish(),
 });
 
-export async function addLeadFieldAction(formData: FormData) {
+async function addLeadField(formData: FormData) {
   await requireAgencyAdmin();
   const parsed = addLeadFieldSchema.parse({
     clientId: formData.get("clientId"),
@@ -470,7 +532,8 @@ export async function addLeadFieldAction(formData: FormData) {
 
   assertLabelAvailable(existing ?? [], parsed.label);
 
-  const existingKeys = new Set((existing ?? []).map((d) => d.key));
+  // Reserved keys stay taken even when a default field is deleted, so it can be restored and never collides with API params.
+  const existingKeys = new Set<string>([...(existing ?? []).map((d) => d.key), ...RESERVED_FIELD_KEYS]);
   const baseKey = slugifyFieldKey(parsed.label);
   let key = baseKey;
   let suffix = 1;
@@ -504,7 +567,7 @@ const updateLeadFieldSchema = z.object({
   isRequired: z.string().nullish(),
 });
 
-export async function updateLeadFieldAction(formData: FormData) {
+async function updateLeadField(formData: FormData) {
   await requireAgencyAdmin();
   const parsed = updateLeadFieldSchema.parse({
     fieldId: formData.get("fieldId"),
@@ -550,7 +613,7 @@ const deleteLeadFieldSchema = z.object({
   clientId: z.string().uuid(),
 });
 
-export async function deleteLeadFieldAction(formData: FormData) {
+async function deleteLeadField(formData: FormData) {
   await requireAgencyAdmin();
   const parsed = deleteLeadFieldSchema.parse({
     fieldId: formData.get("fieldId"),
@@ -562,8 +625,45 @@ export async function deleteLeadFieldAction(formData: FormData) {
     .from("lead_field_definitions")
     .delete()
     .eq("id", parsed.fieldId)
-    .eq("client_id", parsed.clientId)
-    .eq("is_default", false);
+    .eq("client_id", parsed.clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/clients/${parsed.clientId}`);
+  revalidatePath(`/clients/${parsed.clientId}/settings`);
+  revalidatePath("/clients/[id]/leads/[leadId]", "page");
+}
+
+const restoreDefaultLeadFieldSchema = z.object({
+  clientId: z.string().uuid(),
+  key: z.enum(DEFAULT_FIELD_KEYS),
+});
+
+async function restoreDefaultLeadField(formData: FormData) {
+  await requireAgencyAdmin();
+  const parsed = restoreDefaultLeadFieldSchema.parse({
+    clientId: formData.get("clientId"),
+    key: formData.get("key"),
+  });
+  const seed = DEFAULT_FIELD_SEED.find((f) => f.key === parsed.key)!;
+
+  const supabase = createServerClient();
+  const { data: existing } = await supabase
+    .from("lead_field_definitions")
+    .select("id, label")
+    .eq("client_id", parsed.clientId);
+
+  assertLabelAvailable(existing ?? [], seed.label);
+
+  const { error } = await supabase.from("lead_field_definitions").insert({
+    client_id: parsed.clientId,
+    key: seed.key,
+    label: seed.label,
+    field_type: "text",
+    is_required: seed.is_required,
+    is_default: true,
+    is_enabled: true,
+    sort_order: seed.sort_order,
+  });
   if (error) throw new Error(error.message);
 
   revalidatePath(`/clients/${parsed.clientId}`);
@@ -577,9 +677,11 @@ const updateDefaultLeadFieldSchema = z.object({
   label: z.string().trim().min(1, "Nosaukums ir obligāts"),
   isRequired: z.string().nullish(),
   isEnabled: z.string().nullish(),
+  fieldType: z.enum(["text", "number", "date", "select"]).optional(),
+  options: z.string().trim().nullish(),
 });
 
-export async function updateDefaultLeadFieldAction(formData: FormData) {
+async function updateDefaultLeadField(formData: FormData) {
   await requireAgencyAdmin();
   const parsed = updateDefaultLeadFieldSchema.parse({
     fieldId: formData.get("fieldId"),
@@ -587,15 +689,18 @@ export async function updateDefaultLeadFieldAction(formData: FormData) {
     label: formData.get("label"),
     isRequired: formData.get("isRequired"),
     isEnabled: formData.get("isEnabled"),
+    fieldType: formData.get("fieldType") ?? undefined,
+    options: formData.get("options"),
   });
 
   const supabase = createServerClient();
   const { data: existing } = await supabase
     .from("lead_field_definitions")
-    .select("id, label")
+    .select("id, label, key")
     .eq("client_id", parsed.clientId);
 
   assertLabelAvailable(existing ?? [], parsed.label, parsed.fieldId);
+  const current = (existing ?? []).find((d) => d.id === parsed.fieldId);
 
   const { error } = await supabase
     .from("lead_field_definitions")
@@ -603,6 +708,7 @@ export async function updateDefaultLeadFieldAction(formData: FormData) {
       label: parsed.label,
       is_required: parsed.isRequired === "on",
       is_enabled: parsed.isEnabled === "on",
+      ...defaultFieldTypeUpdate(current?.key, parsed.fieldType, parsed.options),
     })
     .eq("id", parsed.fieldId)
     .eq("client_id", parsed.clientId)

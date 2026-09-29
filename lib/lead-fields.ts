@@ -1,6 +1,36 @@
-import type { LeadFieldDefinition } from "./types";
+import type { LeadFieldDefinition, LeadFieldType } from "./types";
 
-export type DefaultFieldKey = "name" | "email" | "phone" | "group_name" | "preferred_dates";
+export const DEFAULT_FIELD_KEYS = ["name", "email", "phone", "group_name", "preferred_dates"] as const;
+export type DefaultFieldKey = (typeof DEFAULT_FIELD_KEYS)[number];
+
+// Top-level JSON parameter each default field uses in POST /api/leads (null = not accepted by the API).
+export const DEFAULT_FIELD_API_PARAM: Record<DefaultFieldKey, string | null> = {
+  name: null,
+  email: "email",
+  phone: "phone",
+  group_name: "group",
+  preferred_dates: "dates",
+};
+
+// Custom field keys share the flat API body with the default parameters, so none of these may be used.
+export const RESERVED_FIELD_KEYS: readonly string[] = [...DEFAULT_FIELD_KEYS, "group", "dates"];
+
+// Default fields stored in plain text columns can change type; email (format check, WhatsApp contact)
+// and preferred_dates (a date[] column) keep their fixed format.
+export const TYPE_EDITABLE_DEFAULT_KEYS: readonly string[] = ["name", "phone", "group_name"];
+
+export function defaultFieldTypeUpdate(
+  key: string | undefined,
+  fieldType: LeadFieldType | undefined,
+  optionsInput: string | null | undefined
+): Partial<Pick<LeadFieldDefinition, "field_type" | "options">> {
+  if (!key || !fieldType || !TYPE_EDITABLE_DEFAULT_KEYS.includes(key)) return {};
+  const options = fieldType === "select" ? parseSelectOptions(optionsInput ?? "") : null;
+  if (fieldType === "select" && (!options || options.length === 0)) {
+    throw new Error("Izvēlnes laukam jānorāda vismaz viena opcija.");
+  }
+  return { field_type: fieldType, options };
+}
 
 export const DEFAULT_FIELD_SEED: { key: DefaultFieldKey; label: string; is_required: boolean; sort_order: number }[] = [
   { key: "name", label: "Vārds", is_required: true, sort_order: -10 },
@@ -17,8 +47,9 @@ export function getDefaultFieldDef(
   return defs.find((d) => d.is_default && d.key === key);
 }
 
+// A deleted default field has no settings row, so a missing row means the field isn't used.
 export function isDefaultFieldEnabled(defs: LeadFieldDefinition[], key: DefaultFieldKey): boolean {
-  return getDefaultFieldDef(defs, key)?.is_enabled ?? true;
+  return getDefaultFieldDef(defs, key)?.is_enabled ?? false;
 }
 
 function checkDefaultFieldRequired(def: LeadFieldDefinition | undefined, isEmpty: boolean): void {
@@ -38,7 +69,7 @@ export function resolveAndCheckDefaultField<T>(
   emptyValue: T,
   isEmpty: (v: T) => boolean
 ): T {
-  const enabled = def?.is_enabled ?? true;
+  const enabled = def?.is_enabled ?? false;
   const resolved = enabled ? value : emptyValue;
   checkDefaultFieldRequired(def, isEmpty(resolved));
   return resolved;
@@ -83,10 +114,10 @@ export function validateDefaultFields(
   checkDefaultFieldRequired(datesDef, !datesInput);
 
   return {
-    name: name || null,
+    name: name && nameDef ? validateFieldValue(nameDef, name) : name || null,
     email: email || null,
-    phone: phone || null,
-    group_name: groupName || null,
+    phone: phone && phoneDef ? validateFieldValue(phoneDef, phone) : phone || null,
+    group_name: groupName && groupDef ? validateFieldValue(groupDef, groupName) : groupName || null,
     datesInput,
   };
 }
